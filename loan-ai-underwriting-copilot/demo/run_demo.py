@@ -22,10 +22,11 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from src.demo_cases import load_cases  # noqa: E402
-from src.pipeline_runner import analyze_packet  # noqa: E402
-from src.schemas import LLM_SUMMARY_SCHEMA, validate  # noqa: E402
+from demo_cases import load_cases  # noqa: E402
+from pipeline_runner import analyze_packet  # noqa: E402
+from schemas import LLM_SUMMARY_SCHEMA, validate  # noqa: E402
 
 COLUMNS = "{:<26} {:<22} {:<22} {:<7} {:<12} {:<6}"
 

@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from . import extraction
-from .schemas import (
+import extraction
+from schemas import (
     COMPLETENESS_SCHEMA,
     CONDITIONALLY_REQUIRED_DOCUMENTS,
     REQUIRED_DOCUMENTS,

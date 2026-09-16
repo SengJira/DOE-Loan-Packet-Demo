@@ -9,9 +9,9 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from . import extraction
-from .normalization import coefficient_of_variation, parse_date, to_float
-from .schemas import BORROWER_CONTEXT_SCHEMA, validate
+import extraction
+from normalization import coefficient_of_variation, parse_date, to_float
+from schemas import BORROWER_CONTEXT_SCHEMA, validate
 
 SALARY_KEYWORDS = ("salary", "payroll", "wage", "income", "เงินเดือน")
 RETURNED_KEYWORDS = ("returned", "nsf", "insufficient funds", "bounced", "reversal", "unpaid")

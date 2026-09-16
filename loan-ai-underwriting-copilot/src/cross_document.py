@@ -11,8 +11,8 @@ from collections.abc import Iterable
 from datetime import date
 from typing import Any
 
-from . import extraction
-from .normalization import (
+import extraction
+from normalization import (
     normalize_address,
     normalize_date,
     normalize_employer,
@@ -22,7 +22,7 @@ from .normalization import (
     relative_difference,
     to_float,
 )
-from .schemas import CROSS_DOCUMENT_SCHEMA, validate
+from schemas import CROSS_DOCUMENT_SCHEMA, validate
 
 SEVERITY_WEIGHT = {"HIGH": 1.0, "MEDIUM": 0.5, "LOW": 0.25}
 MAX_DOCUMENT_AGE_DAYS = 120

@@ -15,9 +15,9 @@ from typing import Any
 
 import requests
 
-from .config import Config, load_config
-from .logging_utils import log_event
-from .schemas import SchemaValidationError, validate
+from config import Config, load_config
+from logging_utils import log_event
+from schemas import SchemaValidationError, validate
 
 _FENCE = re.compile(r"^\s*```(?:json)?\s*|\s*```\s*$", flags=re.IGNORECASE)
 RETRYABLE_STATUS = {408, 409, 425, 429, 500, 502, 503, 504}

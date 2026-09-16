@@ -9,10 +9,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from . import extraction
-from .config import Config, load_config
-from .normalization import relative_difference, to_float
-from .schemas import FINANCIAL_RISK_SCHEMA, validate
+import extraction
+from config import Config, load_config
+from normalization import relative_difference, to_float
+from schemas import FINANCIAL_RISK_SCHEMA, validate
 
 # code -> (severity, points). Kept in one table so the README can document it.
 RISK_POINTS: dict[str, int] = {

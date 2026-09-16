@@ -10,9 +10,9 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from .config import Config, load_config
-from .cross_document import has_high_severity_mismatch, identity_uncertain
-from .schemas import ROUTING_SCHEMA, validate
+from config import Config, load_config
+from cross_document import has_high_severity_mismatch, identity_uncertain
+from schemas import ROUTING_SCHEMA, validate
 
 HUMAN_REVIEW = "HUMAN_REVIEW"
 READY_FOR_UNDERWRITER = "READY_FOR_UNDERWRITER"

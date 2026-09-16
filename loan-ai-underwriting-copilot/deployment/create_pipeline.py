@@ -30,7 +30,7 @@ import json
 
 from _common import SERVICE_NAME, find_pipeline, find_service, get_project
 
-from src.config import load_config
+from config import load_config
 
 NODE_SEQUENCE = [
     "validate_packet_completeness",
@@ -107,6 +107,9 @@ def main() -> None:
         project_id=project.id,
         dataset_id=source.id,
         load_existing_data=False,  # never bulk-process the existing dataset
+        data_filters=dl.Filters(
+            custom_filter={"$and": [{"hidden": False}, {"type": "file"}]}
+        ),
         position=(1, 1),
     )
     pipeline.nodes.add(node=source_node)
@@ -169,6 +172,7 @@ def main() -> None:
     route_node.connect(node=underwriter_task, filters=_route_filter(dl, "READY_FOR_UNDERWRITER"))
     route_node.connect(node=review_task, filters=_route_filter(dl, "HUMAN_REVIEW"))
     review_task.connect(node=capture_node, action="approve")
+    underwriter_task.connect(node=capture_node, action="approve")
     capture_node.connect(node=ground_truth_node)
 
     pipeline.update()

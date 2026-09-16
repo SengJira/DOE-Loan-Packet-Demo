@@ -1,10 +1,10 @@
-from src.borrower_context import build_borrower_context
-from src.cross_document import (
+from borrower_context import build_borrower_context
+from cross_document import (
     cross_document_reasoning,
     has_high_severity_mismatch,
     identity_uncertain,
 )
-from src.schemas import CROSS_DOCUMENT_SCHEMA, is_valid
+from schemas import CROSS_DOCUMENT_SCHEMA, is_valid
 
 
 def _run(packet):

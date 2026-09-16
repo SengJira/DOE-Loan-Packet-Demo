@@ -3,21 +3,21 @@ import json
 import pytest
 import requests
 
-from src.borrower_context import build_borrower_context
-from src.completeness import validate_packet_completeness
-from src.config import load_config
-from src.cross_document import cross_document_reasoning
-from src.financial_risk import assess_financial_risk
-from src.logging_utils import mask_identifier, redact
-from src.nvidia_client import (
+from borrower_context import build_borrower_context
+from completeness import validate_packet_completeness
+from config import load_config
+from cross_document import cross_document_reasoning
+from financial_risk import assess_financial_risk
+from logging_utils import mask_identifier, redact
+from nvidia_client import (
     ModelResponseError,
     NvidiaApiError,
     NvidiaClient,
     parse_json_response,
     strip_code_fences,
 )
-from src.schemas import LLM_SUMMARY_SCHEMA, UNDERWRITING_SUMMARY_SCHEMA, is_valid
-from src.underwriting_summary import (
+from schemas import LLM_SUMMARY_SCHEMA, UNDERWRITING_SUMMARY_SCHEMA, is_valid
+from underwriting_summary import (
     generate_underwriting_summary,
     minimize_context,
 )

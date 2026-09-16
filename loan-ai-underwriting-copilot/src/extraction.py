@@ -12,7 +12,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
-from .schemas import DOCUMENT_CATEGORIES
+from schemas import DOCUMENT_CATEGORIES
 
 DOCUMENT_TYPE_ALIASES: dict[str, str] = {
     "loan_application": "loan_application",

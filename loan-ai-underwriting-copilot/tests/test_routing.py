@@ -1,10 +1,10 @@
 import pytest
 
-from src.config import load_config
-from src.demo_cases import load_cases
-from src.pipeline_runner import analyze_packet
-from src.routing import HUMAN_REVIEW, READY_FOR_UNDERWRITER, route_by_confidence_and_risk
-from src.schemas import ROUTING_SCHEMA, is_valid
+from config import load_config
+from demo_cases import load_cases
+from pipeline_runner import analyze_packet
+from routing import HUMAN_REVIEW, READY_FOR_UNDERWRITER, route_by_confidence_and_risk
+from schemas import ROUTING_SCHEMA, is_valid
 
 
 def _reason_codes(routing):

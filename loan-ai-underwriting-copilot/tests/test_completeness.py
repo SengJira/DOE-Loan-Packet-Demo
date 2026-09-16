@@ -1,5 +1,5 @@
-from src.completeness import validate_packet_completeness
-from src.schemas import COMPLETENESS_SCHEMA, is_valid
+from completeness import validate_packet_completeness
+from schemas import COMPLETENESS_SCHEMA, is_valid
 
 
 def test_clean_packet_is_complete(clean_packet):

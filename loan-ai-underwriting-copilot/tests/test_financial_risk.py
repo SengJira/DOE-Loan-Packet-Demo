@@ -1,8 +1,8 @@
-from src.borrower_context import build_borrower_context
-from src.completeness import validate_packet_completeness
-from src.cross_document import cross_document_reasoning
-from src.financial_risk import assess_financial_risk
-from src.schemas import FINANCIAL_RISK_SCHEMA, is_valid
+from borrower_context import build_borrower_context
+from completeness import validate_packet_completeness
+from cross_document import cross_document_reasoning
+from financial_risk import assess_financial_risk
+from schemas import FINANCIAL_RISK_SCHEMA, is_valid
 
 
 def _assess(packet):

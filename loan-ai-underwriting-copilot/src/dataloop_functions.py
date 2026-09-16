@@ -13,9 +13,16 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import tempfile
 from datetime import datetime, timezone
 from typing import Any
+
+# The Dataloop FaaS runner loads this file as a top-level module, so sibling
+# imports resolve flat; make them work the same way outside the src package.
+_SRC_DIR = os.path.dirname(os.path.abspath(__file__))
+if _SRC_DIR not in sys.path:
+    sys.path.insert(0, _SRC_DIR)
 
 try:  # dtlpy exists in the Dataloop runtime; keep imports optional for local tests
     import dtlpy as dl
@@ -28,15 +35,15 @@ except Exception:  # pragma: no cover - local/offline execution
         pass
 
 
-from .borrower_context import build_borrower_context
-from .completeness import validate_packet_completeness
-from .config import load_config
-from .cross_document import cross_document_reasoning
-from .financial_risk import assess_financial_risk
-from .logging_utils import log_event, node_span
-from .pipeline_runner import ANALYSIS_VERSION, packet_fingerprint
-from .routing import HUMAN_REVIEW, READY_FOR_UNDERWRITER, route_by_confidence_and_risk
-from .underwriting_summary import generate_underwriting_summary
+from borrower_context import build_borrower_context  # noqa: E402
+from completeness import validate_packet_completeness  # noqa: E402
+from config import load_config  # noqa: E402
+from cross_document import cross_document_reasoning  # noqa: E402
+from financial_risk import assess_financial_risk  # noqa: E402
+from logging_utils import log_event, node_span  # noqa: E402
+from pipeline_runner import ANALYSIS_VERSION, packet_fingerprint  # noqa: E402
+from routing import HUMAN_REVIEW, READY_FOR_UNDERWRITER, route_by_confidence_and_risk  # noqa: E402
+from underwriting_summary import generate_underwriting_summary  # noqa: E402
 
 METADATA_ROOT = "aiUnderwriting"
 

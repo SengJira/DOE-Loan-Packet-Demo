@@ -15,8 +15,11 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
+SRC_DIR = REPO_ROOT / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
 
-from src.config import load_config  # noqa: E402
+from config import load_config  # noqa: E402
 
 PACKAGE_NAME = "loan-ai-underwriting-copilot"
 SERVICE_NAME = "loan-ai-underwriting-copilot-v1"

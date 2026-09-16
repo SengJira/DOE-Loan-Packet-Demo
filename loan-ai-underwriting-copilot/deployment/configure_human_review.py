@@ -29,11 +29,11 @@ import json
 
 from _common import find_task, get_project
 
-from src.config import load_config
+from config import load_config
 
 REVIEW_FORM = {
     "final_review_result": {
-        "type": "single-choice",
+        "type": "options",
         "required": True,
         "values": [
             "APPROVED_FOR_UNDERWRITING",
@@ -42,16 +42,16 @@ REVIEW_FORM = {
             "ESCALATED",
         ],
     },
-    "decision_reason": {"type": "text", "required": True},
-    "reviewer_comments": {"type": "text", "required": False},
+    "decision_reason": {"type": "freeText", "required": True},
+    "reviewer_comments": {"type": "freeText", "required": False},
     "risk_flag_decision": {
-        "type": "multi-choice",
+        "type": "options",
         "required": False,
         "description": "Confirm or dismiss each AI risk flag (code:CONFIRMED / code:DISMISSED).",
         "values": ["CONFIRMED", "DISMISSED", "NEEDS_MORE_EVIDENCE"],
     },
     "corrected_fields": {
-        "type": "text",
+        "type": "freeText",
         "required": False,
         "description": "JSON object of corrected extracted values, e.g. {\"declared_monthly_income\": 65000}.",
     },
@@ -86,13 +86,35 @@ def main() -> None:
     import dtlpy as dl
 
     project = get_project(dl)
-    task = find_task(project, config.human_review_task_name)
+    copilot_tasks = [
+        t
+        for t in project.tasks.list()
+        if t and getattr(t, "name", "") and config.pipeline_name in t.name
+    ]
+    task = next(
+        (t for t in copilot_tasks if t.name == config.human_review_task_name),
+        None,
+    ) or find_task(project, config.human_review_task_name)
     if task is None:
         raise SystemExit(
             f"task {config.human_review_task_name} not found; run deployment/create_pipeline.py first"
         )
 
-    recipe = dl.recipes.get(recipe_id=task.recipe_id)
+    # Clone the source recipe so the review form never edits the recipe shared
+    # with the existing pipelines, then repoint the copilot tasks at the clone.
+    review_recipe_id = getattr(task, "recipe_id", None)
+    if getattr(task, "copilot_review_recipe", None):
+        review_recipe_id = task.copilot_review_recipe
+    recipe = dl.recipes.get(recipe_id=review_recipe_id)
+    if not getattr(recipe, "title", "").endswith("(underwriting-copilot)"):
+        recipe = recipe.clone()
+        recipe.title = f"{recipe.title} (underwriting-copilot)"
+        recipe.update(system_metadata=True)
+        for t in copilot_tasks:
+            t.recipe_id = recipe.id
+            t.update()
+        print(f"cloned recipe for copilot review: {recipe.id}")
+
     ontology = recipe.ontologies.list()[0]
 
     existing_labels = {label.tag for label in ontology.labels}
