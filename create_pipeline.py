@@ -59,6 +59,7 @@ from __future__ import annotations
 
 import argparse
 import inspect
+import os
 import sys
 
 DOC_TYPES = ("loan_application", "pay_stub", "bank_statement", "w2",
@@ -251,6 +252,141 @@ def clip_classify(item):
     user["min_confidence"] = round(min(1.0, max(0.0, margin * 12 + 0.5)), 3)
     user["confidence_source"] = "clip-margin"
     user["classified_by"] = "pipeline/clip_classify"
+    item.update()
+    return item
+
+
+def nemotron_classify(item):
+    """Classify a document via NVIDIA nemotron-parse over the hosted NIM API.
+
+    Rasterizes page 1 (PyMuPDF when present, else the matching PNG in the
+    `loan-packet-images` dataset), posts it to the NIM chat-completions
+    endpoint, then scores the parsed markdown for the five loan document
+    types. Writes doc_type and min_confidence to item metadata.
+
+    The NGC key is read from env (NGC_API_KEY / NVIDIA_API_KEY, injected via
+    the service's `secrets` integrations) with a fallback to
+    project.metadata['user']['ngc_api_key'].
+
+    Keep every code-node body pure ASCII. Dataloop truncates the uploaded
+    source by the number of extra bytes any non-ASCII character costs.
+    """
+    import base64
+    import io
+    import json
+    import os
+    import urllib.request
+    import dtlpy as dl
+
+    doc_types = ["loan_application", "pay_stub", "bank_statement", "w2",
+                 "id_verification"]
+    keywords = {
+        "loan_application": ["loan application", "borrower", "applicant",
+                             "loan amount", "property address"],
+        "pay_stub": ["pay stub", "pay period", "gross pay", "net pay",
+                     "ytd", "earnings"],
+        "bank_statement": ["bank statement", "account number",
+                           "opening balance", "closing balance",
+                           "transactions", "deposit"],
+        "w2": ["w-2", "wage and tax", "social security", "medicare",
+               "employer identification"],
+        "id_verification": ["identity verification", "id verification",
+                            "driver license", "passport", "date of birth",
+                            "expiration"],
+    }
+    user = item.metadata.setdefault("user", {})
+    project = item.dataset.project
+    key = os.environ.get("NGC_API_KEY") or os.environ.get("NVIDIA_API_KEY")
+    if not key:
+        key = item.dataset.metadata.get("user", {}).get("ngc_api_key")
+
+    # If an upstream model node already ran predict_items, reuse its output:
+    # parsed text lives in annotation labels/descriptions and item metadata.
+    parts = []
+    try:
+        for ann in item.annotations.list().annotations:
+            for val in (ann.label or "",
+                        (ann.description or "") if hasattr(ann, "description")
+                        else "",
+                        str(ann.attributes or "")):
+                if val:
+                    parts.append(val)
+    except Exception:
+        pass
+    meta_text = user.get("nemotron_text") or user.get("parse_markdown") or ""
+    if meta_text:
+        parts.append(meta_text)
+    text = " ".join(parts)
+
+    if text:
+        user["nemotron_chars"] = len(text)
+        user["parse_source"] = "model-node"
+    elif not key:
+        user["nemotron_error"] = "no NGC key available"
+    else:
+        png = None
+        try:
+            import fitz
+            buf = item.download(save_locally=False)
+            raw = buf.getvalue() if hasattr(buf, "getvalue") else bytes(buf)
+            doc = fitz.open(stream=raw, filetype="pdf")
+            png = doc[0].get_pixmap(dpi=150).tobytes("png")
+        except Exception:
+            try:
+                images_ds = project.datasets.get(
+                    dataset_name="loan-packet-images")
+                stem = item.name.rsplit(".", 1)[0]
+                f = dl.Filters()
+                f.add(field="filename", values=f"*{stem}*")
+                img_items = list(images_ds.items.list(filters=f).all())
+                if img_items:
+                    buf = img_items[0].download(save_locally=False)
+                    png = buf.getvalue() if hasattr(buf, "getvalue") \
+                        else bytes(buf)
+            except Exception as exc:
+                user["nemotron_error"] = f"rasterize failed: {str(exc)[:200]}"
+
+        if png:
+            try:
+                body = json.dumps({
+                    "model": "nvidia/nemotron-parse",
+                    "messages": [{"role": "user", "content": [{
+                        "type": "image_url",
+                        "image_url": {"url": "data:image/png;base64,"
+                                      + base64.b64encode(png).decode()}}]}],
+                    "temperature": 0,
+                    "max_tokens": 4096,
+                }).encode()
+                req = urllib.request.Request(
+                    "https://integrate.api.nvidia.com/v1/chat/completions",
+                    data=body,
+                    headers={"Authorization": f"Bearer {key}",
+                             "Content-Type": "application/json"})
+                resp = json.loads(
+                    urllib.request.urlopen(req, timeout=180).read())
+                text = resp["choices"][0]["message"]["content"] or ""
+                user["nemotron_chars"] = len(text)
+            except Exception as exc:
+                user["nemotron_error"] = f"nim call failed: {str(exc)[:250]}"
+        elif "nemotron_error" not in user:
+            user["nemotron_error"] = "could not rasterize item"
+
+    low_text = text.lower()
+    scores = {t: sum(1 for kw in kws if kw in low_text)
+              for t, kws in keywords.items()}
+    ranked = sorted(scores.values(), reverse=True)
+    best = max(scores, key=scores.get)
+    if not text or ranked[0] == 0:
+        doc_type, conf = "unknown", 0.0
+    else:
+        doc_type = best
+        margin = ranked[0] - (ranked[1] if len(ranked) > 1 else 0)
+        conf = round(min(0.99, 0.5 + 0.1 * ranked[0] + 0.15 * margin), 3)
+
+    user["doc_type"] = doc_type
+    user["min_confidence"] = conf
+    user["confidence_source"] = "nemotron-keywords"
+    user["classified_by"] = "pipeline/nemotron_classify"
     item.update()
     return item
 
@@ -565,9 +701,115 @@ def build_ai_classify_pipeline(dl, args, project, pipeline, source):
     return ground_truth_node
 
 
+def build_nemotron_pipeline(dl, args, project, pipeline, source):
+    structured = get_or_create_dataset(project, args.structured_dataset)
+    ground_truth = get_or_create_dataset(project, args.ground_truth_dataset)
+
+    folder_filters = dl.Filters()
+    folder_filters.add(field="dir", values=f"/{args.source_folder}*")
+
+    incoming = dl.DatasetNode(
+        name="incoming",
+        project_id=project.id,
+        dataset_id=source.id,
+        dataset_folder=f"/{args.source_folder}",
+        load_existing_data=True,
+        data_filters=folder_filters,
+        position=(1, 3),
+    )
+    pipeline.nodes.add(incoming)
+
+    classify = dl.CodeNode(
+        name="nemotron_classify",
+        project_id=project.id,
+        project_name=project.name,
+        method=nemotron_classify,
+        position=(3, 3),
+    )
+    if args.nemotron_model:
+        model = project.models.get(model_name=args.nemotron_model)
+        service_ids = model.metadata.get("system", {}) \
+            .get("deploy", {}).get("services", [])
+        if not service_ids:
+            raise SystemExit(
+                f"model {args.nemotron_model} has no deployed service — "
+                f"deploy it first (model.deploy())")
+        service = project.services.get(service_id=service_ids[0])
+        parse = dl.FunctionNode(
+            name="nemotron_parse",
+            service=service,
+            function_name="predict_items",
+            project_id=project.id,
+            project_name=project.name,
+            position=(2, 3),
+        )
+        incoming.connect(node=parse)
+        parse.connect(node=classify)
+    else:
+        incoming.connect(node=classify)
+
+    review = dl.TaskNode(
+        name="low_confidence_review",
+        project_id=project.id,
+        dataset_id=source.id,
+        recipe_title=source.recipes.list()[0].title,
+        recipe_id=source.recipes.list()[0].id,
+        task_owner=args.task_owner,
+        task_type="annotation",
+        workload=[dl.WorkloadUnit(assignee_id=args.task_owner, load=100)],
+        position=(6, 5),
+    )
+    pipeline.nodes.add(review)
+
+    structured_node = dl.DatasetNode(
+        name="structured_output",
+        project_id=project.id,
+        dataset_id=structured.id,
+        position=(6, 1),
+    )
+    pipeline.nodes.add(structured_node)
+
+    ground_truth_node = dl.DatasetNode(
+        name="ground_truth",
+        project_id=project.id,
+        dataset_id=ground_truth.id,
+        position=(7, 5),
+    )
+    pipeline.nodes.add(ground_truth_node)
+
+    for row, doc_type in enumerate(DOC_TYPES):
+        extract = dl.CodeNode(
+            name=f"extract_{doc_type}",
+            project_id=project.id,
+            project_name=project.name,
+            method=extract_fields,
+            position=(5, row + 1),
+        )
+        pipeline.nodes.add(extract)
+
+        type_filter = dl.Filters()
+        type_filter.add(field="metadata.user.doc_type", values=doc_type)
+        classify.connect(node=extract, filters=type_filter)
+
+        high = dl.Filters()
+        high.add(field="metadata.user.min_confidence",
+                 values=args.threshold,
+                 operator=dl.FiltersOperations.GREATER_THAN_OR_EQUAL)
+        extract.connect(node=structured_node, filters=high)
+
+        low = dl.Filters()
+        low.add(field="metadata.user.min_confidence",
+                values=args.threshold,
+                operator=dl.FiltersOperations.LESS_THAN)
+        extract.connect(node=review, filters=low)
+
+    review.connect(node=ground_truth_node, action="complete")
+    return ground_truth_node
+
+
 def build(dl, args):
     for func in (classify_document_type, extract_fields, auto_label,
-                 clip_classify, retrain_trigger):
+                 clip_classify, nemotron_classify, retrain_trigger):
         assert_ascii(func)
 
     project = dl.projects.get(project_name=args.project)
@@ -590,6 +832,9 @@ def build(dl, args):
     elif args.template == "ai-classify":
         ground_truth_node = build_ai_classify_pipeline(dl, args, project,
                                                        pipeline, source)
+    elif args.template == "nemotron":
+        ground_truth_node = build_nemotron_pipeline(dl, args, project,
+                                                    pipeline, source)
     else:
         ground_truth_node = build_extract_pipeline(dl, args, project,
                                                    pipeline, source)
@@ -615,6 +860,17 @@ def build(dl, args):
               "in the console) — starting it provisions one service per code "
               "node")
 
+    if args.template == "nemotron":
+        try:
+            source.metadata.setdefault("user", {})["ngc_api_key"] = \
+                os.environ["NGC_API_KEY"]
+            source.update()
+            print("stored NGC key on source dataset metadata "
+                  "(metadata.user.ngc_api_key)")
+        except KeyError:
+            print("NGC_API_KEY not in env and not on dataset metadata — "
+                  "the classify node will report 'no NGC key'")
+
     print(f"https://console.dataloop.ai/projects/{project.id}/pipelines/"
           f"{pipeline.id}")
     return 0
@@ -632,7 +888,7 @@ def main() -> int:
                     help="dataset receiving high-confidence auto-labels "
                          "(annotate template)")
     ap.add_argument("--template", choices=("extract", "annotate",
-                                           "ai-classify"),
+                                           "ai-classify", "nemotron"),
                     default="extract",
                     help="extract: /incoming classify/extract/review flow; "
                          "annotate: /unlabeled auto-label flow")
@@ -651,6 +907,13 @@ def main() -> int:
                     help="service id of the deployed CLIP extract_item "
                          "function (ai-classify template); defaults to the "
                          "service named clip-extraction")
+    ap.add_argument("--nemotron-model", default=None,
+                    help="deployed nemotron model name; when set, the "
+                         "pipeline calls its predict_items via a model "
+                         "(function) node instead of the direct NIM call")
+    ap.add_argument("--ngc-integration", default="dl-ngc-api-key",
+                    help="org integration name carrying the NGC API key "
+                         "(nemotron template)")
     ap.add_argument("--delete-existing", action="store_true",
                     help="delete a pipeline of the same name first")
     args = ap.parse_args()
