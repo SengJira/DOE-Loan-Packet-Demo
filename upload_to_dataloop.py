@@ -3,6 +3,7 @@
 upload_to_dataloop.py — push generated loan packets into a Dataloop project.
 
   python upload_to_dataloop.py --data ./demo_data --project "Loan-Docs-Demo"
+  python upload_to_dataloop.py --data ./demo_data --dry-run
 
 What it does:
   1. creates (or gets) the project and a `loan-packets` dataset
@@ -19,15 +20,18 @@ the PDF studio in your tenant, so create those interactively once and mirror
 the resulting annotation JSON here if you want them pre-populated.
 
 Verify every call against your tenant before the demo — dtlpy surfaces change.
+
+--dry-run validates the input directory, prints the dataset/ontology/upload
+actions that would be performed, and makes no network calls at all (dtlpy is
+not even imported). Exits non-zero if the input directory is unusable.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
-
-import dtlpy as dl
 
 # Fields the demo extracts, grouped by document type. These become the labels
 # in the recipe ontology.
@@ -57,7 +61,13 @@ ONTOLOGY = {
 }
 
 
-def ensure_login():
+def load_dtlpy():
+    import dtlpy as dl
+
+    return dl
+
+
+def ensure_login(dl):
     if dl.token_expired():
         dl.login()
 
@@ -79,10 +89,18 @@ def main():
     ap.add_argument("--dataset", default="loan-packets")
     ap.add_argument("--splits", default="base,unlabeled",
                     help="which split folders to upload (incoming stays local)")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="validate inputs and print the planned actions without "
+                         "contacting Dataloop")
     args = ap.parse_args()
 
     data = Path(args.data)
-    ensure_login()
+
+    if args.dry_run:
+        return dry_run(args, data)
+
+    dl = load_dtlpy()
+    ensure_login(dl)
 
     try:
         project = dl.projects.get(project_name=args.project)
@@ -154,5 +172,103 @@ def main():
     print('  one packet      ->  {"metadata.user.loan_id": "LN-123456"}')
 
 
+def dry_run(args, data: Path) -> int:
+    """Validate the generated dataset and print the plan. No network, no dtlpy."""
+    errors = []
+    splits = [s.strip() for s in args.splits.split(",") if s.strip()]
+
+    print("DRY RUN — no network calls will be made")
+    print(f"data directory : {data.resolve()}")
+    print(f"project        : {args.project}")
+    print(f"dataset        : {args.dataset}")
+    print(f"splits         : {', '.join(splits)}\n")
+
+    if not data.is_dir():
+        print(f"ERROR: data directory {data} does not exist", file=sys.stderr)
+        return 1
+
+    def load(name, required=True):
+        p = data / name
+        if not p.exists():
+            if required:
+                errors.append(f"missing {name}")
+            return None
+        try:
+            return json.loads(p.read_text())
+        except json.JSONDecodeError as exc:
+            errors.append(f"{name} is not valid JSON: {exc}")
+            return None
+
+    meta = load("dataloop_metadata.json")
+    ground_truth = load("ground_truth.json")
+    prelabels = load("prelabels.json", required=False)
+    if not (data / "manifest.csv").exists():
+        errors.append("missing manifest.csv")
+
+    print("PLAN")
+    print(f"  project.get_or_create   {args.project!r}")
+    print(f"  dataset.get_or_create   {args.dataset!r}")
+    labels = build_labels()
+    print(f"  recipe.add_labels       {len(labels)} labels "
+          f"({len(ONTOLOGY)} doc types + document_type)")
+    for doc_type, fields in ONTOLOGY.items():
+        print(f"      {doc_type:<18} {len(fields)} fields")
+
+    total = 0
+    remote_paths = {}
+    for split in splits:
+        folder = data / split
+        if not folder.is_dir():
+            errors.append(f"split folder {split} does not exist")
+            continue
+        pdfs = sorted(folder.glob("*.pdf"))
+        total += len(pdfs)
+        if not pdfs:
+            print(f"  items.upload            {split}: nothing to upload, would skip")
+            continue
+        for p in pdfs:
+            item_meta = (meta or {}).get(p.name)
+            if item_meta is None:
+                errors.append(f"{p.name} has no entry in dataloop_metadata.json")
+                item_meta = {}
+            if ground_truth is not None and p.name not in ground_truth:
+                errors.append(f"{p.name} has no entry in ground_truth.json")
+            rp = f"/{split}/{item_meta.get('user', {}).get('doc_type', 'misc')}"
+            remote_paths[rp] = remote_paths.get(rp, 0) + 1
+        print(f"  items.upload            {split}: {len(pdfs)} PDFs")
+    for rp in sorted(remote_paths):
+        print(f"      {rp:<34} {remote_paths[rp]:>4} items")
+
+    if prelabels is not None:
+        unlabeled = {
+            name for name, entry in (ground_truth or {}).items()
+            if entry.get("split") == "unlabeled"
+        }
+        would_attach = len(unlabeled & set(prelabels)) if unlabeled else 0
+        print(f"  item.update             would attach predictions to "
+              f"{would_attach} unlabeled items")
+        for name, entry in prelabels.items():
+            preds = entry.get("predictions")
+            if not isinstance(preds, dict) or not preds:
+                errors.append(f"prelabels.json entry {name} has no predictions")
+                break
+            if any("value" not in v or "confidence" not in v for v in preds.values()):
+                errors.append(f"prelabels.json entry {name} is missing value/confidence")
+                break
+
+    print(f"\n{total} files would be uploaded; incoming/ stays on disk.")
+
+    if errors:
+        print(f"\nVALIDATION FAILED ({len(errors)} problem(s)):", file=sys.stderr)
+        for e in errors[:20]:
+            print(f"  - {e}", file=sys.stderr)
+        if len(errors) > 20:
+            print(f"  ... and {len(errors) - 20} more", file=sys.stderr)
+        return 1
+
+    print("validation OK")
+    return 0
+
+
 if __name__ == "__main__":
-    main()
+    sys.exit(main() or 0)
