@@ -1,0 +1,58 @@
+# Optional convenience path. The .ps1 wrappers do not need this file and do
+# not read it — everything here is also available as a plain `podman run`.
+#
+#   podman-compose run --rm generate --packets 10 --seed 7
+#   podman-compose run --rm verify
+#   podman-compose run --rm upload-dryrun
+#
+# podman-compose is a separate pip/winget package; `podman compose` shells out
+# to it (or to docker-compose) and is not part of Podman itself. If it is not
+# installed, use the .ps1 scripts.
+#
+# Note: compose has no equivalent of --userns=keep-id that works consistently
+# across podman-compose versions, so `userns_mode` is set explicitly below.
+# If your podman-compose rejects it, drop the line and run the .ps1 scripts
+# instead; ownership of ./demo_data is the only thing at stake.
+version: "3.8"
+
+x-common: &common
+  build:
+    context: .
+    dockerfile: Containerfile
+  image: localhost/loan-packet-demo:local
+  userns_mode: "keep-id"
+  volumes:
+    - ./demo_data:/data:rw
+
+services:
+  # podman-compose run --rm generate --packets 10 --seed 7
+  generate:
+    <<: *common
+    command: ["generate", "--out", "/data"]
+
+  # podman-compose run --rm verify
+  verify:
+    <<: *common
+    command: ["verify", "--data", "/data"]
+
+  # podman-compose run --rm upload-dryrun
+  # network_mode: none guarantees the dry run cannot reach a tenant.
+  upload-dryrun:
+    <<: *common
+    network_mode: "none"
+    volumes:
+      - ./demo_data:/data:ro
+    command: ["upload", "--data", "/data", "--dry-run"]
+
+  # Real upload. Credentials are never baked into the image: mount the dtlpy
+  # state directory and/or forward variables from your shell.
+  #   DATALOOP_STATE=$HOME/.dataloop podman-compose run --rm upload
+  upload:
+    <<: *common
+    volumes:
+      - ./demo_data:/data:ro
+      - ${DATALOOP_STATE:-./.dataloop}:/home/app/.dataloop:rw
+    environment:
+      - DTLPY_CUSTOM_ENV
+      - DATALOOP_PATH
+    command: ["upload", "--data", "/data"]
