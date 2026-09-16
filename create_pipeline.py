@@ -24,6 +24,24 @@ annotate:
         -> completed annotations             -> ground-truth dataset
         -> retrain_trigger
 
+ai-classify (real AI: CLIP embedding + nearest-centroid):
+    /incoming of the images dataset (dataset node)
+        -> extract_item                      FunctionNode on the clip-extraction
+                                             service (embeds the item with CLIP)
+        -> clip_classify                     code node: cosine similarity against
+                                             per-type centroids of the labeled
+                                             /base images
+        -> split by type                     (5 filtered edges)
+        -> extract_<doc_type>                (one extraction node per type)
+        -> confidence filter on the edge:
+             min_confidence >= threshold  -> structured-output dataset
+             min_confidence <  threshold  -> review task
+        -> completed reviews                 -> ground-truth dataset
+        -> retrain_trigger
+
+    Requires a rasterized copy of the PDF dataset (see README-pipeline.md)
+    and the deployed CLIP model service id via --clip-service.
+
 Usage:
     python create_pipeline.py --project "DDOE demo - Loan Packet Processing"
     python create_pipeline.py --template annotate --name loan-auto-annotation \
@@ -155,6 +173,84 @@ def auto_label(item):
 
     user["min_confidence"] = min(confidence.values())
     user["labeled_by"] = "pipeline/auto_label"
+    item.update()
+    return item
+
+
+def clip_classify(item):
+    """Classify an image item by CLIP-embedding nearest-centroid.
+
+    Reads the item's CLIP embedding from the model's feature set, compares it
+    against per-document-type centroids built from the labeled /base images,
+    and writes doc_type plus min_confidence to item metadata. The confidence
+    is a margin score: how clearly the best centroid beats the runner-up.
+
+    Keep every code-node body pure ASCII. Dataloop truncates the uploaded
+    source by the number of extra bytes any non-ASCII character costs.
+    """
+    import math
+    import dtlpy as dl
+
+    doc_types = ["loan_application", "pay_stub", "bank_statement", "w2",
+                 "id_verification"]
+    user = item.metadata.setdefault("user", {})
+    dataset = item.dataset
+    project = dataset.project
+
+    # Labeled reference items live in /base of the same dataset.
+    base_filters = dl.Filters()
+    base_filters.add(field="dir", values="/base*")
+    labeled = {}
+    for ref in dataset.items.list(filters=base_filters).all():
+        t = ref.metadata.get("user", {}).get("doc_type")
+        if t in doc_types:
+            labeled[ref.id] = t
+
+    fs = project.feature_sets.get(
+        feature_set_name="CLIP model for semantic search")
+    vectors = {}
+    item_vec = None
+    for feat in fs.features.list().all():
+        v = list(feat.value)
+        if feat.entity_id == item.id:
+            item_vec = v
+        elif feat.entity_id in labeled:
+            vectors[feat.entity_id] = v
+
+    if item_vec is None:
+        user["doc_type"] = "unknown"
+        user["min_confidence"] = 0.0
+        user["classified_by"] = "pipeline/clip_classify:no-embedding"
+        item.update()
+        return item
+
+    def norm(v):
+        n = math.sqrt(sum(x * x for x in v)) or 1.0
+        return [x / n for x in v]
+
+    def dot(a, b):
+        return sum(x * y for x, y in zip(a, b))
+
+    iv = norm(item_vec)
+    sims = {}
+    for t in doc_types:
+        vecs = [vectors[i] for i, lt in labeled.items() if lt == t
+                and i in vectors]
+        if not vecs:
+            sims[t] = 0.0
+            continue
+        centroid = norm([sum(vec[d] for vec in vecs) / len(vecs)
+                         for d in range(len(item_vec))])
+        sims[t] = dot(iv, centroid)
+
+    ranked = sorted(sims.values(), reverse=True)
+    best_type = max(sims, key=sims.get)
+    margin = ranked[0] - (ranked[1] if len(ranked) > 1 else 0.0)
+
+    user["doc_type"] = best_type
+    user["min_confidence"] = round(min(1.0, max(0.0, margin * 12 + 0.5)), 3)
+    user["confidence_source"] = "clip-margin"
+    user["classified_by"] = "pipeline/clip_classify"
     item.update()
     return item
 
@@ -367,9 +463,111 @@ def build_annotate_pipeline(dl, args, project, pipeline, source):
     return ground_truth_node
 
 
+def build_ai_classify_pipeline(dl, args, project, pipeline, source):
+    structured = get_or_create_dataset(project, args.structured_dataset)
+    ground_truth = get_or_create_dataset(project, args.ground_truth_dataset)
+
+    try:
+        service = project.services.get(service_id=args.clip_service)
+    except Exception:
+        service = next(s for s in project.services.list().items
+                       if s.name == args.clip_service)
+
+    folder_filters = dl.Filters()
+    folder_filters.add(field="dir", values=f"/{args.source_folder}*")
+
+    incoming = dl.DatasetNode(
+        name="incoming",
+        project_id=project.id,
+        dataset_id=source.id,
+        dataset_folder=f"/{args.source_folder}",
+        load_existing_data=True,
+        data_filters=folder_filters,
+        position=(1, 3),
+    )
+    pipeline.nodes.add(incoming)
+
+    embed = dl.FunctionNode(
+        name="clip_embed",
+        service=service,
+        function_name="extract_item",
+        project_id=project.id,
+        project_name=project.name,
+        position=(2, 3),
+    )
+    incoming.connect(node=embed)
+
+    classify = dl.CodeNode(
+        name="clip_classify",
+        project_id=project.id,
+        project_name=project.name,
+        method=clip_classify,
+        position=(3, 3),
+    )
+    embed.connect(node=classify)
+
+    review = dl.TaskNode(
+        name="low_confidence_review",
+        project_id=project.id,
+        dataset_id=source.id,
+        recipe_title=source.recipes.list()[0].title,
+        recipe_id=source.recipes.list()[0].id,
+        task_owner=args.task_owner,
+        task_type="annotation",
+        workload=[dl.WorkloadUnit(assignee_id=args.task_owner, load=100)],
+        position=(6, 5),
+    )
+    pipeline.nodes.add(review)
+
+    structured_node = dl.DatasetNode(
+        name="structured_output",
+        project_id=project.id,
+        dataset_id=structured.id,
+        position=(6, 1),
+    )
+    pipeline.nodes.add(structured_node)
+
+    ground_truth_node = dl.DatasetNode(
+        name="ground_truth",
+        project_id=project.id,
+        dataset_id=ground_truth.id,
+        position=(7, 5),
+    )
+    pipeline.nodes.add(ground_truth_node)
+
+    for row, doc_type in enumerate(DOC_TYPES):
+        extract = dl.CodeNode(
+            name=f"extract_{doc_type}",
+            project_id=project.id,
+            project_name=project.name,
+            method=extract_fields,
+            position=(5, row + 1),
+        )
+        pipeline.nodes.add(extract)
+
+        type_filter = dl.Filters()
+        type_filter.add(field="metadata.user.doc_type", values=doc_type)
+        classify.connect(node=extract, filters=type_filter)
+
+        high = dl.Filters()
+        high.add(field="metadata.user.min_confidence",
+                 values=args.threshold,
+                 operator=dl.FiltersOperations.GREATER_THAN_OR_EQUAL)
+        extract.connect(node=structured_node, filters=high)
+
+        low = dl.Filters()
+        low.add(field="metadata.user.min_confidence",
+                values=args.threshold,
+                operator=dl.FiltersOperations.LESS_THAN)
+        extract.connect(node=review, filters=low)
+
+    review.connect(node=ground_truth_node, action="complete")
+    return ground_truth_node
+
+
 def build(dl, args):
     for func in (classify_document_type, extract_fields, auto_label,
-                 retrain_trigger):
+                 clip_classify, retrain_trigger):
         assert_ascii(func)
 
     project = dl.projects.get(project_name=args.project)
@@ -389,6 +587,9 @@ def build(dl, args):
     if args.template == "annotate":
         ground_truth_node = build_annotate_pipeline(dl, args, project,
                                                     pipeline, source)
+    elif args.template == "ai-classify":
+        ground_truth_node = build_ai_classify_pipeline(dl, args, project,
+                                                       pipeline, source)
     else:
         ground_truth_node = build_extract_pipeline(dl, args, project,
                                                    pipeline, source)
@@ -430,7 +631,8 @@ def main() -> int:
     ap.add_argument("--annotated-dataset", default="loan-auto-annotated",
                     help="dataset receiving high-confidence auto-labels "
                          "(annotate template)")
-    ap.add_argument("--template", choices=("extract", "annotate"),
+    ap.add_argument("--template", choices=("extract", "annotate",
+                                           "ai-classify"),
                     default="extract",
                     help="extract: /incoming classify/extract/review flow; "
                          "annotate: /unlabeled auto-label flow")
@@ -445,9 +647,15 @@ def main() -> int:
                     help="minimum confidence that skips human review")
     ap.add_argument("--start", action="store_true",
                     help="install the pipeline (provisions services)")
+    ap.add_argument("--clip-service",
+                    help="service id of the deployed CLIP extract_item "
+                         "function (ai-classify template); defaults to the "
+                         "service named clip-extraction")
     ap.add_argument("--delete-existing", action="store_true",
                     help="delete a pipeline of the same name first")
     args = ap.parse_args()
+    if args.clip_service is None:
+        args.clip_service = "clip-extraction"
     if args.source_folder is None:
         args.source_folder = ("unlabeled" if args.template == "annotate"
                               else "incoming")
