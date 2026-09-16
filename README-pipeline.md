@@ -18,6 +18,31 @@ Routing is done with connection conditions (DQL) rather than branching code, so
 the type split and the confidence threshold are both readable straight off the
 pipeline graph in the console.
 
+## Auto-annotation template
+
+`--template annotate` builds a second pipeline for labelling the `unlabeled`
+split automatically:
+
+```
+/unlabeled (dataset node)
+   -> auto_label                                 code node (writes a Classification annotation)
+   -> confidence filter on the edge:
+        metadata.user.min_confidence >= 0.75  ->  loan-auto-annotated        (dataset node)
+        metadata.user.min_confidence <  0.75  ->  low_confidence_annotation  (annotation task)
+   -> task action "complete"                  ->  loan-ground-truth          (dataset node)
+   -> retrain_trigger                             code node
+```
+
+```bash
+python create_pipeline.py --template annotate --name loan-auto-annotation \
+  --delete-existing --start
+```
+
+`auto_label` attaches a `Classification` annotation with the document type and
+sets `min_confidence` the same way `extract_fields` does; swap its body for a
+real pre-labeling model. The destination dataset is `--annotated-dataset`
+(default `loan-auto-annotated`).
+
 ## Run it
 
 ```bash
@@ -32,8 +57,10 @@ Useful flags:
 | flag | default | meaning |
 | --- | --- | --- |
 | `--source-dataset` | `loan-packets` | dataset holding `/incoming` |
-| `--incoming-folder` | `incoming` | folder the dataset node watches |
+| `--template` | `extract` | `extract` or `annotate` |
+| `--source-folder` | `incoming` / `unlabeled` | folder the dataset node watches (`--incoming-folder` still accepted) |
 | `--structured-dataset` | `loan-structured-output` | created if missing |
+| `--annotated-dataset` | `loan-auto-annotated` | annotate template sink |
 | `--ground-truth-dataset` | `loan-ground-truth` | created if missing |
 | `--threshold` | `0.75` | confidence that skips human review |
 | `--task-owner` | logged-in user | owner/assignee of the review task |
@@ -54,6 +81,8 @@ Two code nodes carry demo bodies that a real deployment replaces:
 * `extract_fields` promotes the prelabels the generator produced into
   `metadata.user.extraction` and sets `metadata.user.min_confidence`. Swap the
   body for the extraction model.
+* `auto_label` (annotate template) writes a `Classification` annotation per
+  item; swap the body for a real pre-labeling model.
 
 `retrain_trigger` counts the ground-truth dataset and logs whether the batch
 size (`RETRAIN_BATCH_SIZE`, default 50) has been reached; the `model.train()`

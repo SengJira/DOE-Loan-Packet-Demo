@@ -2,6 +2,9 @@
 """
 create_pipeline.py — build the loan-packet processing pipeline in Dataloop.
 
+Two templates, selected with --template:
+
+extract (default):
     /incoming (dataset node)
         -> classify_document_type            (which of the five doc types)
         -> split by type                     (5 filtered edges)
@@ -12,9 +15,19 @@ create_pipeline.py — build the loan-packet processing pipeline in Dataloop.
         -> completed reviews                 -> ground-truth dataset
         -> retrain_trigger
 
+annotate:
+    /unlabeled (dataset node)
+        -> auto_label                        (writes annotations)
+        -> confidence filter on the edge:
+             min_confidence >= threshold  -> auto-annotated dataset
+             min_confidence <  threshold  -> annotation task
+        -> completed annotations             -> ground-truth dataset
+        -> retrain_trigger
+
 Usage:
     python create_pipeline.py --project "DDOE demo - Loan Packet Processing"
-    python create_pipeline.py --project ... --threshold 0.75 --delete-existing
+    python create_pipeline.py --template annotate --name loan-auto-annotation \
+        --delete-existing --start
 
 The pipeline is created but NOT installed/started: starting it provisions a
 service per code node on the tenant. Start it from the console when you want
@@ -79,6 +92,7 @@ def extract_fields(item):
     silently lops characters off the end of the function.
     """
     import hashlib
+    import dtlpy as dl
 
     user = item.metadata.setdefault("user", {})
     prediction = user.get("prediction") or {}
@@ -96,6 +110,51 @@ def extract_fields(item):
     user["extraction"] = prediction
     user["min_confidence"] = min(confidence.values())
     user["extracted_by"] = "pipeline/extract_fields"
+    item.update()
+    return item
+
+
+def auto_label(item):
+    """Annotate the item with its predicted document type and confidence.
+
+    Replace this body with a real pre-labeling model. Until then it uses the
+    generator's prelabels where they exist (the `unlabeled` split) and a
+    deterministic synthetic confidence where they do not, so the confidence
+    edge still splits items between the dataset and the annotation task.
+
+    Keep every code-node body pure ASCII. Dataloop truncates the uploaded
+    source by the number of extra bytes any non-ASCII character costs.
+    """
+    import hashlib
+    import dtlpy as dl
+
+    user = item.metadata.setdefault("user", {})
+    prediction = user.get("prediction") or {}
+    confidence = user.get("confidence") or {}
+    doc_types = ["loan_application", "pay_stub", "bank_statement", "w2",
+                 "id_verification"]
+
+    doc_type = user.get("doc_type")
+    if doc_type not in doc_types:
+        name = item.name.lower()
+        doc_type = next((t for t in doc_types if t in name), "unknown")
+        user["doc_type"] = doc_type
+
+    if not confidence:
+        fields = list(prediction) or ["doc_type"]
+        for field in fields:
+            seed = hashlib.sha256(f"{item.id}:{field}".encode()).digest()
+            # 0.55 .. 0.99, so a little over half clear a 0.75 threshold
+            confidence[field] = round(0.55 + (seed[0] / 255) * 0.44, 3)
+        user["confidence"] = confidence
+        user["confidence_source"] = "synthetic"
+
+    builder = item.annotations.builder()
+    builder.add(annotation_definition=dl.Classification(label=doc_type))
+    item.annotations.upload(builder)
+
+    user["min_confidence"] = min(confidence.values())
+    user["labeled_by"] = "pipeline/auto_label"
     item.update()
     return item
 
@@ -145,34 +204,18 @@ def get_or_create_dataset(project, name):
         return dataset
 
 
-def build(dl, args):
-    for func in (classify_document_type, extract_fields, retrain_trigger):
-        assert_ascii(func)
-
-    project = dl.projects.get(project_name=args.project)
-    print(f"project {project.name} ({project.id})")
-
-    source = project.datasets.get(dataset_name=args.source_dataset)
+def build_extract_pipeline(dl, args, project, pipeline, source):
     structured = get_or_create_dataset(project, args.structured_dataset)
     ground_truth = get_or_create_dataset(project, args.ground_truth_dataset)
 
-    if args.delete_existing:
-        try:
-            project.pipelines.delete(pipeline_name=args.name)
-            print(f"deleted the existing pipeline {args.name}")
-        except Exception:
-            pass
-
-    pipeline = project.pipelines.create(name=args.name, project_id=project.id)
-
     incoming_filters = dl.Filters()
-    incoming_filters.add(field="dir", values=f"/{args.incoming_folder}*")
+    incoming_filters.add(field="dir", values=f"/{args.source_folder}*")
 
     incoming = dl.DatasetNode(
         name="incoming",
         project_id=project.id,
         dataset_id=source.id,
-        dataset_folder=f"/{args.incoming_folder}",
+        dataset_folder=f"/{args.source_folder}",
         load_existing_data=True,
         data_filters=incoming_filters,
         position=(1, 3),
@@ -217,7 +260,7 @@ def build(dl, args):
     )
     pipeline.nodes.add(ground_truth_node)
 
-    # One extraction node per document type, reached by a filtered edge —
+    # One extraction node per document type, reached by a filtered edge -
     # that pair of things is the "split by type".
     for row, doc_type in enumerate(DOC_TYPES):
         extract = dl.CodeNode(
@@ -249,6 +292,106 @@ def build(dl, args):
 
     # Completed reviews are the new ground truth.
     review.connect(node=ground_truth_node, action="complete")
+    return ground_truth_node
+
+
+def build_annotate_pipeline(dl, args, project, pipeline, source):
+    annotated = get_or_create_dataset(project, args.annotated_dataset)
+    ground_truth = get_or_create_dataset(project, args.ground_truth_dataset)
+
+    folder_filters = dl.Filters()
+    folder_filters.add(field="dir", values=f"/{args.source_folder}*")
+
+    unlabeled = dl.DatasetNode(
+        name="unlabeled",
+        project_id=project.id,
+        dataset_id=source.id,
+        dataset_folder=f"/{args.source_folder}",
+        load_existing_data=True,
+        data_filters=folder_filters,
+        position=(1, 3),
+    )
+    pipeline.nodes.add(unlabeled)
+
+    labeler = dl.CodeNode(
+        name="auto_label",
+        project_id=project.id,
+        project_name=project.name,
+        method=auto_label,
+        position=(2, 3),
+    )
+    unlabeled.connect(node=labeler)
+
+    task = dl.TaskNode(
+        name="low_confidence_annotation",
+        project_id=project.id,
+        dataset_id=source.id,
+        recipe_title=source.recipes.list()[0].title,
+        recipe_id=source.recipes.list()[0].id,
+        task_owner=args.task_owner,
+        task_type="annotation",
+        workload=[dl.WorkloadUnit(assignee_id=args.task_owner, load=100)],
+        position=(3, 5),
+    )
+    pipeline.nodes.add(task)
+
+    annotated_node = dl.DatasetNode(
+        name="auto_annotated",
+        project_id=project.id,
+        dataset_id=annotated.id,
+        position=(3, 1),
+    )
+    pipeline.nodes.add(annotated_node)
+
+    ground_truth_node = dl.DatasetNode(
+        name="ground_truth",
+        project_id=project.id,
+        dataset_id=ground_truth.id,
+        position=(4, 5),
+    )
+    pipeline.nodes.add(ground_truth_node)
+
+    high = dl.Filters()
+    high.add(field="metadata.user.min_confidence",
+             values=args.threshold,
+             operator=dl.FiltersOperations.GREATER_THAN_OR_EQUAL)
+    labeler.connect(node=annotated_node, filters=high)
+
+    low = dl.Filters()
+    low.add(field="metadata.user.min_confidence",
+            values=args.threshold,
+            operator=dl.FiltersOperations.LESS_THAN)
+    labeler.connect(node=task, filters=low)
+
+    task.connect(node=ground_truth_node, action="complete")
+    return ground_truth_node
+
+
+def build(dl, args):
+    for func in (classify_document_type, extract_fields, auto_label,
+                 retrain_trigger):
+        assert_ascii(func)
+
+    project = dl.projects.get(project_name=args.project)
+    print(f"project {project.name} ({project.id})")
+
+    source = project.datasets.get(dataset_name=args.source_dataset)
+
+    if args.delete_existing:
+        try:
+            project.pipelines.delete(pipeline_name=args.name)
+            print(f"deleted the existing pipeline {args.name}")
+        except Exception:
+            pass
+
+    pipeline = project.pipelines.create(name=args.name, project_id=project.id)
+
+    if args.template == "annotate":
+        ground_truth_node = build_annotate_pipeline(dl, args, project,
+                                                    pipeline, source)
+    else:
+        ground_truth_node = build_extract_pipeline(dl, args, project,
+                                                   pipeline, source)
 
     retrain = dl.CodeNode(
         name="retrain_trigger",
@@ -284,7 +427,17 @@ def main() -> int:
     ap.add_argument("--source-dataset", default="loan-packets")
     ap.add_argument("--structured-dataset", default="loan-structured-output")
     ap.add_argument("--ground-truth-dataset", default="loan-ground-truth")
-    ap.add_argument("--incoming-folder", default="incoming")
+    ap.add_argument("--annotated-dataset", default="loan-auto-annotated",
+                    help="dataset receiving high-confidence auto-labels "
+                         "(annotate template)")
+    ap.add_argument("--template", choices=("extract", "annotate"),
+                    default="extract",
+                    help="extract: /incoming classify/extract/review flow; "
+                         "annotate: /unlabeled auto-label flow")
+    ap.add_argument("--source-folder", "--incoming-folder",
+                    dest="source_folder", default=None,
+                    help="dataset folder the pipeline watches (default: "
+                         "incoming for extract, unlabeled for annotate)")
     ap.add_argument("--task-owner",
                     help="email of the review task owner; defaults to the "
                          "logged-in user")
@@ -295,6 +448,9 @@ def main() -> int:
     ap.add_argument("--delete-existing", action="store_true",
                     help="delete a pipeline of the same name first")
     args = ap.parse_args()
+    if args.source_folder is None:
+        args.source_folder = ("unlabeled" if args.template == "annotate"
+                              else "incoming")
 
     import dtlpy as dl
 
