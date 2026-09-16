@@ -27,6 +27,7 @@ of the same name before rebuilding.
 from __future__ import annotations
 
 import argparse
+import inspect
 import sys
 
 DOC_TYPES = ("loan_application", "pay_stub", "bank_statement", "w2",
@@ -66,13 +67,34 @@ def extract_fields(item):
     Replace this body with a call to the extraction model (item.run_model or a
     model adapter). Until then it promotes the prelabels that ship with the
     demo data, so the downstream confidence routing is exercised end to end.
+
+    The generator only writes prelabels for the `unlabeled` split, so items
+    arriving from `/incoming` have none. Rather than scoring those 0.0, which
+    sends every one of them down the low-confidence edge and leaves the
+    structured-output branch empty, a confidence is derived from the item id:
+    deterministic per item and spread either side of the threshold.
+
+    Keep every code-node body pure ASCII. Dataloop truncates the uploaded
+    source by the number of extra bytes any non-ASCII character costs, which
+    silently lops characters off the end of the function.
     """
+    import hashlib
+
     user = item.metadata.setdefault("user", {})
     prediction = user.get("prediction") or {}
     confidence = user.get("confidence") or {}
 
+    if not confidence:
+        fields = list(prediction) or ["doc_type"]
+        for field in fields:
+            seed = hashlib.sha256(f"{item.id}:{field}".encode()).digest()
+            # 0.55 .. 0.99, so a little over half clear a 0.75 threshold
+            confidence[field] = round(0.55 + (seed[0] / 255) * 0.44, 3)
+        user["confidence"] = confidence
+        user["confidence_source"] = "synthetic"
+
     user["extraction"] = prediction
-    user["min_confidence"] = min(confidence.values()) if confidence else 0.0
+    user["min_confidence"] = min(confidence.values())
     user["extracted_by"] = "pipeline/extract_fields"
     item.update()
     return item
@@ -104,6 +126,16 @@ def retrain_trigger(item):
 # --------------------------------------------------------------------------
 
 
+def assert_ascii(func):
+    """Dataloop truncates a code node's source once it contains non-ASCII."""
+    try:
+        inspect.getsource(func).encode("ascii")
+    except UnicodeEncodeError as exc:
+        raise SystemExit(f"{func.__name__} contains a non-ASCII character at "
+                         f"offset {exc.start}; code node sources must be "
+                         f"pure ASCII or Dataloop uploads a truncated body")
+
+
 def get_or_create_dataset(project, name):
     try:
         return project.datasets.get(dataset_name=name)
@@ -114,6 +146,9 @@ def get_or_create_dataset(project, name):
 
 
 def build(dl, args):
+    for func in (classify_document_type, extract_fields, retrain_trigger):
+        assert_ascii(func)
+
     project = dl.projects.get(project_name=args.project)
     print(f"project {project.name} ({project.id})")
 
