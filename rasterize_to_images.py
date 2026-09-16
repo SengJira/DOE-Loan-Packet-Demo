@@ -17,7 +17,7 @@ for it in items:
     remote = it.dir + '/' + png_name
     if any(i.filename == remote for i in done.values()):
         continue
-    local = it.download('/tmp/in.pdf')
+    local = it.download(f'/tmp/in_{it.id}.pdf')
     doc = fitz.open(local)
     pix = doc[0].get_pixmap(matrix=fitz.Matrix(1.5, 1.5))
     buf = io.BytesIO(pix.tobytes('png')); buf.name = png_name

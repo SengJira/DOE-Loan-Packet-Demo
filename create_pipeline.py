@@ -337,10 +337,13 @@ def nemotron_classify(item):
                     dataset_name="loan-packet-images")
                 stem = item.name.rsplit(".", 1)[0]
                 f = dl.Filters()
-                f.add(field="filename", values=f"*{stem}*")
-                img_items = list(images_ds.items.list(filters=f).all())
-                if img_items:
-                    buf = img_items[0].download(save_locally=False)
+                f.add(field="dir", values="/incoming*")
+                match = next(
+                    (im for im in images_ds.items.list(filters=f).all()
+                     if im.name == stem + ".png"
+                     or im.name.startswith(stem + " ")), None)
+                if match:
+                    buf = match.download(save_locally=False)
                     png = buf.getvalue() if hasattr(buf, "getvalue") \
                         else bytes(buf)
             except Exception as exc:
