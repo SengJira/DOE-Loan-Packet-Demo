@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 
 from _common import (
     MODULE_NAME,
@@ -49,6 +50,38 @@ def build_modules(dl):
             functions=functions,
         )
     ]
+
+
+def _ensure_secret_integration(dl, project, name: str):
+    """Create (or reuse) a KEY_VALUE integration holding the NVIDIA key."""
+    try:
+        for integration in project.integrations.list():
+            if integration.get("name") == name:
+                print(f"secret integration exists: {name} ({integration['id']})")
+                return _IntegrationRef(integration["id"])
+    except Exception as exc:
+        print(f"could not list integrations: {exc}")
+    org_id = (project.org or {}).get("id")
+    try:
+        integration = dl.integrations.create(
+            integrations_type=dl.IntegrationType.KEY_VALUE,
+            name=name,
+            options={"key": name, "value": os.environ["NVIDIA_API_KEY"]},
+            metadata={"provider": "NVIDIA"},
+            organization_id=org_id,
+        )
+        print(f"secret integration created: {name} ({integration.id})")
+        return integration
+    except Exception as exc:
+        print(f"could not create secret integration: {exc}")
+        return None
+
+
+class _IntegrationRef:
+    """Minimal stand-in exposing .id for an integration listed as a dict."""
+
+    def __init__(self, integration_id: str):
+        self.id = integration_id
 
 
 def main() -> None:
@@ -85,15 +118,27 @@ def main() -> None:
     )
     print(f"package pushed: {package.name} v{package.version}")
 
+    # The NVIDIA key is provisioned as a KEY_VALUE secret integration and
+    # mounted into the service as the NVIDIA_API_KEY env var at runtime; the
+    # value itself never lands in the service config or logs.
     secrets = []
-    try:
-        integration = project.integrations.get(integrations_id=args.secret_name)
-        secrets = [integration.id]
-    except Exception:
+    if os.environ.get("NVIDIA_API_KEY"):
+        integration = _ensure_secret_integration(dl, project, args.secret_name)
+        if integration is not None:
+            # Service secrets bind an org key_value integration to an env var.
+            secrets = [
+                {
+                    "key": args.secret_name,
+                    "type": "key_value",
+                    "env": args.secret_name,
+                    "value": integration.id,
+                }
+            ]
+    if not secrets:
         print(
-            f"note: no Dataloop secret/integration named {args.secret_name} was found. "
-            "Create it and re-run, or the service will start without an NVIDIA key "
-            "and every packet will fail safe to HUMAN_REVIEW."
+            f"note: no secret integration named {args.secret_name} was provisioned. "
+            "The service will start without an NVIDIA key and every packet will "
+            "fail safe to HUMAN_REVIEW."
         )
 
     existing = find_service(project, SERVICE_NAME)
@@ -101,6 +146,8 @@ def main() -> None:
         print(f"service {SERVICE_NAME} already exists ({existing.id}); updating to the new package revision")
         existing.package_revision = package.version
         existing.init_input = {"config_overrides": env}
+        if secrets:
+            existing.integrations = secrets
         existing.update(force=True)
         service = existing
     else:

@@ -94,7 +94,8 @@ def main() -> None:
 
     source = project.datasets.get(dataset_name=config.source_dataset)
     ground_truth = project.datasets.get(dataset_name=config.ground_truth_dataset)
-    task_owner = args.task_owner or project.contributors[0]["email"]
+    humans = [c.email for c in project.contributors if getattr(c, "type", None) != "bot"]
+    task_owner = args.task_owner or (humans[0] if humans else dl.info()["user_email"])
 
     recipe_id = source.metadata["system"]["recipes"][0]
     recipe_title = project.recipes.get(recipe_id=recipe_id).title or "loan-underwriting-review"

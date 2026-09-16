@@ -41,6 +41,27 @@ from .underwriting_summary import generate_underwriting_summary
 METADATA_ROOT = "aiUnderwriting"
 
 
+def _flat_items(collection: Any):
+    """Yield Item entities across dtlpy list/PagedEntities differences."""
+    for element in collection:
+        if isinstance(element, list):
+            yield from element
+        else:
+            yield element
+
+
+def _document_entry(it: Any) -> dict[str, Any]:
+    user = (it.metadata or {}).get("user") or {}
+    return {
+        "document_id": getattr(it, "id", None) or it.name,
+        "document_type": user.get("doc_type") or "unknown",
+        "file_name": it.name,
+        "readable": True,
+        "fields": user.get("extraction") or user.get("prediction") or {},
+        "extraction_confidence": user.get("min_confidence"),
+    }
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -61,16 +82,60 @@ class LoanUnderwritingCopilot(_BASE):
 
     # ------------------------------------------------------------------ io
     def load_packet(self, item: Any) -> dict[str, Any]:
-        """Read the structured JSON produced by the extraction pipeline."""
+        """Read the structured JSON produced by the extraction pipeline.
+
+        Supports two source shapes:
+        * a packet-level JSON item (whole loan packet in one file), and
+        * document-level items (one file per document) sharing a
+          ``metadata.user.loan_id`` — the packet is assembled from all
+          sibling items in the same dataset.
+        """
         stored = ((item.metadata or {}).get("user") or {}).get("structuredOutput")
         if isinstance(stored, dict):
             return stored
-        with tempfile.TemporaryDirectory() as tmp:
-            path = item.download(local_path=tmp)
-            if isinstance(path, list):
-                path = path[0]
-            with open(path, encoding="utf-8") as handle:
-                return json.load(handle)
+        if str(getattr(item, "mimetype", "")).endswith("json"):
+            with tempfile.TemporaryDirectory() as tmp:
+                path = item.download(local_path=tmp)
+                if isinstance(path, list):
+                    path = path[0]
+                with open(path, encoding="utf-8") as handle:
+                    return json.load(handle)
+        return self._assemble_packet(item)
+
+    def _assemble_packet(self, item: Any) -> dict[str, Any]:
+        """Build one packet dict from every item sharing the item's loan_id."""
+        cached = self._state(item).get("packet_context")
+        if isinstance(cached, dict) and cached.get("documents"):
+            return cached
+        user = (item.metadata or {}).get("user") or {}
+        loan_id = user.get("loan_id") or str(item.name).split("__")[0]
+        dataset = getattr(item, "dataset", None)
+        if dataset is None and dl is not None and getattr(item, "dataset_id", None):
+            try:
+                dataset = dl.datasets.get(dataset_id=item.dataset_id)
+            except Exception:
+                dataset = None
+        documents = []
+        if dataset is not None:
+            for sibling in _flat_items(dataset.items.list()):
+                suser = (sibling.metadata or {}).get("user") or {}
+                if suser.get("loan_id") == loan_id:
+                    documents.append(_document_entry(sibling))
+        if not documents:
+            documents.append(_document_entry(item))
+        packet = {
+            "packet_id": loan_id or getattr(item, "id", None) or str(item.name),
+            "documents": documents,
+            "source_dataset": getattr(dataset, "name", None),
+            # Every document of the loan triggers the pipeline once, so only the
+            # deterministic anchor item runs the analysis; siblings are skipped.
+            "_anchor_item_id": min(str(d["document_id"]) for d in documents),
+        }
+        # Keep the assembled packet inside the (additive) analysis block so the
+        # remaining nodes do not re-list the dataset.
+        item.metadata = item.metadata or {}
+        item.metadata.setdefault("user", {}).setdefault(METADATA_ROOT, {})["packet_context"] = packet
+        return packet
 
     def _state(self, item: Any) -> dict[str, Any]:
         user_metadata = (item.metadata or {}).get("user") or {}
@@ -100,6 +165,10 @@ class LoanUnderwritingCopilot(_BASE):
         packet = self.load_packet(item)
         fingerprint = packet_fingerprint(packet)
         pid = packet.get("packet_id")
+        anchor = packet.get("_anchor_item_id")
+        if anchor and str(getattr(item, "id", "")) != anchor:
+            log_event("node.skipped", node=node, packet_id=pid, status="DUPLICATE_PACKET_ITEM")
+            return item
         cached = self._cached(item, node, fingerprint)
         if cached is not None:
             log_event("node.cached", node=node, packet_id=pid, status="SKIPPED_IDEMPOTENT")
@@ -160,6 +229,15 @@ class LoanUnderwritingCopilot(_BASE):
     def route_by_confidence_and_risk(self, item: Any, context: Any = None) -> Any:
         packet = self.load_packet(item)
         fingerprint = packet_fingerprint(packet)
+        anchor = packet.get("_anchor_item_id")
+        if anchor and str(getattr(item, "id", "")) != anchor:
+            log_event(
+                "node.skipped",
+                node="route_by_confidence_and_risk",
+                packet_id=packet.get("packet_id"),
+                status="DUPLICATE_PACKET_ITEM",
+            )
+            return item
         state = self._state(item)
         completeness = state.get("completeness") or validate_packet_completeness(packet)
         borrower = state.get("borrower_context") or build_borrower_context(packet)

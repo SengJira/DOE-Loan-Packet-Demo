@@ -71,7 +71,11 @@ class NvidiaClient:
         return [m["id"] for m in response.json().get("data", []) if isinstance(m, dict) and "id" in m]
 
     def resolve_model(self, preferred: list[str] | None = None) -> str:
-        """Return the first configured model that the endpoint actually lists."""
+        """Return the first configured model that is listed AND serves inference.
+
+        The /models catalog lists deprecated models that return 404/410 on
+        /chat/completions, so candidates are verified with a one-token probe.
+        """
         candidates = list(preferred or [self.config.model, *self.config.model_preference_order])
         try:
             available = set(self.list_models())
@@ -79,11 +83,34 @@ class NvidiaClient:
             log_event("model.list_failed", error_type=type(exc).__name__)
             return candidates[0]
         for candidate in candidates:
-            if candidate in available:
+            if candidate in available and self._serves_inference(candidate):
                 return candidate
         raise NvidiaApiError(
             "none of the configured models are available on the NVIDIA endpoint: " + ", ".join(candidates)
         )
+
+    def _serves_inference(self, model: str) -> bool:
+        """True when a minimal chat completion succeeds for ``model``."""
+        payload = {
+            "model": model,
+            "messages": [{"role": "user", "content": "OK"}],
+            "max_tokens": 1,
+            "temperature": 0.0,
+            "stream": False,
+        }
+        try:
+            response = self.session.post(
+                f"{self.config.base_url}/chat/completions",
+                headers=self._headers(),
+                json=payload,
+                timeout=self.config.request_timeout_seconds,
+            )
+        except requests.RequestException:
+            return False
+        if response.status_code == 200:
+            return True
+        log_event("model.probe_failed", model=model, http_status=response.status_code, status="SKIP")
+        return False
 
     # -- chat ---------------------------------------------------------------
     def chat_json(

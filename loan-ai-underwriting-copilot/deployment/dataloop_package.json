@@ -103,7 +103,7 @@
   ],
   "environmentVariables": {
     "NVIDIA_BASE_URL": "https://integrate.api.nvidia.com/v1",
-    "NVIDIA_MODEL": "nvidia/llama-3.1-nemotron-70b-instruct",
+    "NVIDIA_MODEL": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning",
     "AI_CONFIDENCE_THRESHOLD": "0.85",
     "PACKET_COMPLETENESS_THRESHOLD": "0.90",
     "ENABLE_VISION_FALLBACK": "false",

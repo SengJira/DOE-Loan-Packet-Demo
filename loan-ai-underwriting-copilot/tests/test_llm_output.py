@@ -129,12 +129,37 @@ def test_non_retryable_status_fails_fast():
 
 def test_resolve_model_prefers_available_model():
     session = FakeSession(
-        [FakeResponse(200, {"data": [{"id": "nvidia/llama-3.1-nemotron-70b-instruct"}]})]
+        [
+            FakeResponse(200, {"data": [{"id": "nvidia/llama-3.1-nemotron-70b-instruct"}]}),
+            FakeResponse(200),  # probe succeeds
+        ]
     )
     client = NvidiaClient(load_config(), session=session)
     assert client.resolve_model(["meta/llama-3.3-70b-instruct", "nvidia/llama-3.1-nemotron-70b-instruct"]) == (
         "nvidia/llama-3.1-nemotron-70b-instruct"
     )
+
+
+def test_resolve_model_skips_listed_but_deprecated_model():
+    session = FakeSession(
+        [
+            FakeResponse(
+                200,
+                {
+                    "data": [
+                        {"id": "nvidia/llama-3.1-nemotron-70b-instruct"},
+                        {"id": "nvidia/nemotron-3-ultra-550b-a55b"},
+                    ]
+                },
+            ),
+            FakeResponse(404),  # 70b probe fails (listed but deprecated)
+            FakeResponse(200),  # ultra probe succeeds
+        ]
+    )
+    client = NvidiaClient(load_config(), session=session)
+    assert client.resolve_model(
+        ["nvidia/llama-3.1-nemotron-70b-instruct", "nvidia/nemotron-3-ultra-550b-a55b"]
+    ) == "nvidia/nemotron-3-ultra-550b-a55b"
 
 
 @pytest.mark.parametrize("key", ["valid_fenced", "valid_with_prose"])

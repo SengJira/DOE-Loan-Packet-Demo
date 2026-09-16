@@ -13,16 +13,21 @@ from typing import Any
 
 DEFAULT_BASE_URL = "https://integrate.api.nvidia.com/v1"
 
-# Verified against GET https://integrate.api.nvidia.com/v1/models (2026-09-16).
-# ``meta/llama-3.3-70b-instruct`` was NOT listed by the endpoint, so the highest
-# preference that is actually available is used as the default.
+# Verified against GET https://integrate.api.nvidia.com/v1/models plus live
+# /chat/completions probes (2026-09-16): ``meta/llama-3.3-70b-instruct`` is not
+# listed at all, the two ~49B-70B Nemotron instruct models are listed but
+# return HTTP 404 on inference (deprecated), and the Nemotron 3 Ultra model
+# exceeds the 120 s request budget in practice. The default is the strongest
+# verified model that serves a schema-valid response inside the timeout.
 PRIMARY_MODEL = "meta/llama-3.3-70b-instruct"
-DEFAULT_MODEL = "nvidia/llama-3.1-nemotron-70b-instruct"
+DEFAULT_MODEL = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
 MODEL_PREFERENCE_ORDER: list[str] = [
     PRIMARY_MODEL,
     "nvidia/llama-3.1-nemotron-70b-instruct",
     "nvidia/llama-3.1-nemotron-51b-instruct",
-    "meta/llama-3.1-70b-instruct",
+    DEFAULT_MODEL,
+    "nvidia/nemotron-3.5-lightning-30b-a3b",
+    "nvidia/nemotron-3-ultra-550b-a55b",
 ]
 DEFAULT_VISION_MODEL = "meta/llama-3.2-90b-vision-instruct"
 

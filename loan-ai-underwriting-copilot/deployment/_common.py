@@ -55,25 +55,36 @@ def login(dl) -> None:
 def get_project(dl):
     config = load_config()
     login(dl)
-    return dl.projects.get(project_id=config.dataloop_project_id)
+    return dl.projects.get(project_id=config.project_id)
+
+
+def _entities(repo_list):
+    """Yield entities across the dtlpy list/PagedEntities API differences."""
+    iterable = repo_list.all() if hasattr(repo_list, "all") else repo_list
+    items = getattr(iterable, "items", iterable)
+    for element in items:
+        if isinstance(element, list):
+            yield from element
+        else:
+            yield element
 
 
 def find_pipeline(project, name: str) -> Any | None:
-    for pipeline in project.pipelines.list().all():
-        if pipeline.name == name:
+    for pipeline in _entities(project.pipelines.list()):
+        if getattr(pipeline, "name", None) == name:
             return pipeline
     return None
 
 
 def find_service(project, name: str) -> Any | None:
-    for service in project.services.list().all():
-        if service.name == name:
+    for service in _entities(project.services.list()):
+        if getattr(service, "name", None) == name:
             return service
     return None
 
 
 def find_task(project, name: str) -> Any | None:
-    for task in project.tasks.list():
-        if task.name == name:
+    for task in _entities(project.tasks.list()):
+        if getattr(task, "name", None) == name:
             return task
     return None

@@ -79,19 +79,26 @@ date tokens at runtime).
 ## Model selection
 
 `GET https://integrate.api.nvidia.com/v1/models` was called before choosing
-(HTTP 200, 82 models listed).
+(HTTP 200, 82 models listed), and every candidate was then verified with a
+live `/chat/completions` probe — the catalog lists deprecated models that
+still return 404/410 on inference.
 
-| Preference | Model | Listed? | Used |
-|---|---|---|---|
-| 1 | `meta/llama-3.3-70b-instruct` | **no** | – |
-| 2 | `nvidia/llama-3.1-nemotron-70b-instruct` | yes | **default** |
-| 3 | `nvidia/llama-3.1-nemotron-51b-instruct` | yes | fallback |
+| Preference | Model | Listed? | Serves inference? | Used |
+|---|---|---|---|---|
+| 1 | `meta/llama-3.3-70b-instruct` | **no** | – | – |
+| 2 | `nvidia/llama-3.1-nemotron-70b-instruct` | yes | **no (404, deprecated)** | – |
+| – | `nvidia/llama-3.1-nemotron-51b-instruct` | yes | **no (404, deprecated)** | – |
+| – | `nvidia/nemotron-3-ultra-550b-a55b` | yes | yes, but exceeds the 120 s budget | fallback |
+| 3 | `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning` | yes | **yes, ~33 s/call, clean JSON** | **default** |
+| – | `nvidia/nemotron-3.5-lightning-30b-a3b` | yes | yes | fallback |
 
-The preferred Llama 3.3 model is not exposed by this endpoint, so the default
-is the highest-preference available model:
-**`nvidia/llama-3.1-nemotron-70b-instruct`**. Override with `NVIDIA_MODEL`;
-`NvidiaClient.resolve_model()` re-checks availability against the live list and
-walks the preference order, so the default self-corrects if Llama 3.3 appears.
+The preferred Llama 3.3 model is not exposed by this endpoint and both ~49B–70B
+Nemotron instruct models are deprecated, so the default is the strongest model
+verified to return schema-valid JSON inside the request budget:
+**`nvidia/nemotron-3-nano-omni-30b-a3b-reasoning`**. Override with
+`NVIDIA_MODEL`; `NvidiaClient.resolve_model()` re-checks the live list and
+probes each candidate, so the default self-corrects if a preferred model comes
+online.
 
 Inference settings: temperature `0.1`, top-p `0.9`, max output `3000` tokens,
 timeout `120 s`, up to `3` retries with exponential backoff and jitter on
@@ -110,7 +117,7 @@ See `.env.example`. Summary:
 |---|---|---|
 | `NVIDIA_API_KEY` | – | required; read at runtime, never logged or persisted |
 | `NVIDIA_BASE_URL` | `https://integrate.api.nvidia.com/v1` | OpenAI-compatible endpoint |
-| `NVIDIA_MODEL` | `nvidia/llama-3.1-nemotron-70b-instruct` | verified model id |
+| `NVIDIA_MODEL` | `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning` | verified model id |
 | `NVIDIA_TEMPERATURE` / `NVIDIA_TOP_P` | `0.1` / `0.9` | sampling |
 | `NVIDIA_MAX_OUTPUT_TOKENS` | `3000` | output budget |
 | `NVIDIA_REQUEST_TIMEOUT` | `120` | seconds |

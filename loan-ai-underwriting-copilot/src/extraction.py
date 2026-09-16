@@ -20,6 +20,7 @@ DOCUMENT_TYPE_ALIASES: dict[str, str] = {
     "loan_app": "loan_application",
     "credit_application": "loan_application",
     "identification": "identification",
+    "id_verification": "identification",
     "id": "identification",
     "id_card": "identification",
     "national_id": "identification",
@@ -27,9 +28,12 @@ DOCUMENT_TYPE_ALIASES: dict[str, str] = {
     "drivers_license": "identification",
     "payslip": "payslip",
     "pay_slip": "payslip",
+    "pay_stub": "payslip",
     "salary_slip": "payslip",
     "proof_of_income": "payslip",
     "income_statement": "payslip",
+    "w2": "payslip",
+    "w_2": "payslip",
     "bank_statement": "bank_statement",
     "bank_statements": "bank_statement",
     "statement": "bank_statement",
@@ -173,11 +177,11 @@ def raw_confidence(entry: Any) -> float | None:
 
 
 def document_fields(document: dict[str, Any]) -> dict[str, Any]:
-    fields = document.get("fields")
-    if isinstance(fields, dict):
-        return fields
-    extracted = document.get("extracted_fields")
-    return extracted if isinstance(extracted, dict) else {}
+    for key in ("fields", "extracted_fields", "extraction", "prediction"):
+        fields = document.get(key)
+        if isinstance(fields, dict) and fields:
+            return fields
+    return {}
 
 
 def find_field(
