@@ -348,12 +348,16 @@ def nemotron_classify(item):
 
         if png:
             try:
+                tool = {"type": "function",
+                        "function": {"name": "markdown_no_bbox"}}
                 body = json.dumps({
                     "model": "nvidia/nemotron-parse",
                     "messages": [{"role": "user", "content": [{
                         "type": "image_url",
                         "image_url": {"url": "data:image/png;base64,"
                                       + base64.b64encode(png).decode()}}]}],
+                    "tools": [tool],
+                    "tool_choice": tool,
                     "temperature": 0,
                     "max_tokens": 4096,
                 }).encode()
@@ -364,7 +368,14 @@ def nemotron_classify(item):
                              "Content-Type": "application/json"})
                 resp = json.loads(
                     urllib.request.urlopen(req, timeout=180).read())
-                text = resp["choices"][0]["message"]["content"] or ""
+                msg = resp["choices"][0]["message"]
+                parts = []
+                for call in msg.get("tool_calls") or []:
+                    args = call["function"]["arguments"]
+                    for entry in json.loads(args):
+                        if isinstance(entry, dict) and entry.get("text"):
+                            parts.append(entry["text"])
+                text = "\n".join(parts) or (msg.get("content") or "")
                 user["nemotron_chars"] = len(text)
             except Exception as exc:
                 user["nemotron_error"] = f"nim call failed: {str(exc)[:250]}"
