@@ -118,6 +118,20 @@ generate --packets 10`). The `.ps1` scripts do not use it and work standalone.
 
 ---
 
+## Offline bundle (customer site, no network)
+
+```powershell
+.\build-bundle.ps1                 # writes D:\DOE_Demo\offline_demo
+```
+
+Exports the image (`podman save`) plus a verified 120-packet dataset, the
+wrappers and checksums into one folder to carry on a USB drive. On the target
+machine, `.\restore-bundle.ps1` checks the checksums, loads the image and
+verifies the dataset with networking disabled. Details and troubleshooting:
+[README-offline.md](README-offline.md).
+
+---
+
 ## Reproducibility
 
 Two runs with the same `--seed` produce the same file list, the same
