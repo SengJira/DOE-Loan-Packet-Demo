@@ -503,7 +503,7 @@ def nemotron_parse(item):
                         parts.append(entry["text"])
             text = "\n".join(parts) or (msg.get("content") or "")
             user["nemotron_chars"] = len(text)
-            user["nemotron_text"] = text[:8000]
+            user["nemotron_text"] = text[:1000]
         except Exception as exc:
             user["nemotron_error"] = f"nim call failed: {str(exc)[:250]}"
     elif "nemotron_error" not in user:
