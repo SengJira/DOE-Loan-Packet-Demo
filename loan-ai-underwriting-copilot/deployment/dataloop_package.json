@@ -1,0 +1,113 @@
+{
+  "name": "loan-ai-underwriting-copilot",
+  "displayName": "Loan AI Underwriting Copilot",
+  "version": "1.0.0",
+  "description": "Evidence-grounded AI underwriting copilot. Consumes loan-structured-output, produces completeness, consistency, risk and summary artefacts, and routes uncertain or high-risk packets to a human underwriter.",
+  "scope": "project",
+  "attributes": {
+    "Provider": "NVIDIA",
+    "Category": "Application",
+    "Application Type": "Pipeline Node",
+    "Media Type": ["Text"]
+  },
+  "codebase": {
+    "type": "item",
+    "srcPath": ".."
+  },
+  "modules": [
+    {
+      "name": "loan_underwriting_copilot",
+      "entryPoint": "src/dataloop_functions.py",
+      "className": "LoanUnderwritingCopilot",
+      "initInputs": [
+        {
+          "type": "Json",
+          "name": "config_overrides"
+        }
+      ],
+      "functions": [
+        {
+          "name": "validate_packet_completeness",
+          "displayName": "1. Validate packet completeness",
+          "description": "Checks required documents and extracted fields; never invents missing values.",
+          "input": [{"type": "Item", "name": "item"}],
+          "output": [{"type": "Item", "name": "item"}],
+          "displayIcon": "qa-check"
+        },
+        {
+          "name": "build_borrower_context",
+          "displayName": "2. Build borrower context",
+          "description": "Normalises extracted values into one borrower view with source references.",
+          "input": [{"type": "Item", "name": "item"}],
+          "output": [{"type": "Item", "name": "item"}]
+        },
+        {
+          "name": "cross_document_reasoning",
+          "displayName": "3. Cross-document reasoning",
+          "description": "Deterministic normalised comparisons across documents, each with evidence.",
+          "input": [{"type": "Item", "name": "item"}],
+          "output": [{"type": "Item", "name": "item"}]
+        },
+        {
+          "name": "assess_financial_risk",
+          "displayName": "4. Assess financial risk",
+          "description": "Transparent demo risk indicators (not a credit score).",
+          "input": [{"type": "Item", "name": "item"}],
+          "output": [{"type": "Item", "name": "item"}]
+        },
+        {
+          "name": "generate_underwriting_summary",
+          "displayName": "5. Generate underwriting summary",
+          "description": "NVIDIA-hosted LLM produces a schema-validated, evidence-grounded brief.",
+          "input": [{"type": "Item", "name": "item"}],
+          "output": [{"type": "Item", "name": "item"}]
+        },
+        {
+          "name": "route_by_confidence_and_risk",
+          "displayName": "6. Route by confidence and risk",
+          "description": "Deterministic routing to READY_FOR_UNDERWRITER or HUMAN_REVIEW.",
+          "input": [{"type": "Item", "name": "item"}],
+          "output": [{"type": "Item", "name": "item"}]
+        },
+        {
+          "name": "capture_reviewer_feedback",
+          "displayName": "7. Capture reviewer feedback as ground truth",
+          "description": "Writes reviewer-approved output to a dedicated folder in loan-ground-truth. Never overwrites existing items.",
+          "input": [{"type": "Item", "name": "item"}],
+          "output": [{"type": "Item", "name": "item"}]
+        }
+      ]
+    }
+  ],
+  "services": [
+    {
+      "name": "loan-ai-underwriting-copilot-v1",
+      "moduleName": "loan_underwriting_copilot",
+      "packageName": "loan-ai-underwriting-copilot",
+      "runtime": {
+        "podType": "regular-xs",
+        "concurrency": 4,
+        "autoscaler": {
+          "type": "rabbitmq",
+          "minReplicas": 0,
+          "maxReplicas": 2,
+          "queueLength": 10
+        }
+      },
+      "executionTimeout": 600,
+      "maxAttempts": 2,
+      "initParams": {
+        "config_overrides": {}
+      }
+    }
+  ],
+  "environmentVariables": {
+    "NVIDIA_BASE_URL": "https://integrate.api.nvidia.com/v1",
+    "NVIDIA_MODEL": "nvidia/llama-3.1-nemotron-70b-instruct",
+    "AI_CONFIDENCE_THRESHOLD": "0.85",
+    "PACKET_COMPLETENESS_THRESHOLD": "0.90",
+    "ENABLE_VISION_FALLBACK": "false",
+    "LOG_LEVEL": "INFO"
+  },
+  "secrets": ["NVIDIA_API_KEY"]
+}

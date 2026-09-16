@@ -1,0 +1,1053 @@
+{
+  "note": "Synthetic demo data only. No real customer PII. Dates use ${T-n} tokens resolved at load time.",
+  "currency": "THB",
+  "cases": [
+    {
+      "case_id": "case-1-clean",
+      "title": "Clean packet",
+      "description": "All documents present, identifiers match, stable verified income.",
+      "expected_route": "READY_FOR_UNDERWRITER",
+      "expected_signals": [
+        "completeness_score >= 0.90",
+        "no high-severity mismatch",
+        "risk_level LOW"
+      ],
+      "packet": {
+        "packet_id": "SYN-LP-0001",
+        "currency": "THB",
+        "source_pipeline": "loan-packet-processing",
+        "synthetic": true,
+        "documents": [
+          {
+            "document_id": "SYN-LP-0001-app",
+            "document_type": "loan_application",
+            "file_name": "SYN-LP-0001_application.pdf",
+            "readable": true,
+            "fields": {
+              "applicant_name": {
+                "value": "Mr. Somchai Jaidee",
+                "confidence": 0.98
+              },
+              "date_of_birth": {
+                "value": "1988-04-12",
+                "confidence": 0.97
+              },
+              "identification_number": {
+                "value": "1-1023-45678-90-1",
+                "confidence": 0.96
+              },
+              "current_address": {
+                "value": "88/12 Sukhumvit Rd, Watthana, Bangkok 10110",
+                "confidence": 0.95
+              },
+              "employer": {
+                "value": "Siam Digital Co., Ltd.",
+                "confidence": 0.96
+              },
+              "employment_status": {
+                "value": "Full-time permanent",
+                "confidence": 0.97
+              },
+              "declared_monthly_income": {
+                "value": 60000,
+                "confidence": 0.95
+              },
+              "requested_loan_amount": {
+                "value": 300000,
+                "confidence": 0.98
+              },
+              "loan_purpose": {
+                "value": "Home renovation",
+                "confidence": 0.94
+              },
+              "document_date": {
+                "value": "${T-10}",
+                "confidence": 0.99
+              }
+            }
+          },
+          {
+            "document_id": "SYN-LP-0001-id",
+            "document_type": "identification",
+            "file_name": "SYN-LP-0001_national_id.jpg",
+            "readable": true,
+            "fields": {
+              "applicant_name": {
+                "value": "SOMCHAI JAIDEE",
+                "confidence": 0.97
+              },
+              "date_of_birth": {
+                "value": "12/04/1988",
+                "confidence": 0.96
+              },
+              "identification_number": {
+                "value": "1102345678901",
+                "confidence": 0.97
+              },
+              "current_address": {
+                "value": "88/12 Sukhumvit Road, Watthana, Bangkok 10110",
+                "confidence": 0.93
+              },
+              "document_date": {
+                "value": "${T-60}",
+                "confidence": 0.9
+              }
+            }
+          },
+          {
+            "document_id": "SYN-LP-0001-payslip",
+            "document_type": "payslip",
+            "file_name": "SYN-LP-0001_payslip.pdf",
+            "readable": true,
+            "fields": {
+              "applicant_name": {
+                "value": "Somchai Jaidee",
+                "confidence": 0.96
+              },
+              "employer": {
+                "value": "Siam Digital Co Ltd",
+                "confidence": 0.95
+              },
+              "employment_status": {
+                "value": "Full-time",
+                "confidence": 0.94
+              },
+              "net_monthly_income": {
+                "value": 60000,
+                "confidence": 0.96
+              },
+              "document_date": {
+                "value": "${T-20}",
+                "confidence": 0.98
+              }
+            }
+          },
+          {
+            "document_id": "SYN-LP-0001-bank",
+            "document_type": "bank_statement",
+            "file_name": "SYN-LP-0001_bank_statement.pdf",
+            "readable": true,
+            "fields": {
+              "account_holder": {
+                "value": "Somchai Jaidee",
+                "confidence": 0.95
+              },
+              "document_date": {
+                "value": "${T-15}",
+                "confidence": 0.98
+              }
+            },
+            "transactions": [
+              {
+                "date": "${T-90}",
+                "description": "SALARY SIAM DIGITAL PAYROLL",
+                "amount": 60000,
+                "balance": 48000.0,
+                "category": "salary",
+                "type": "credit"
+              },
+              {
+                "date": "${T-90}",
+                "description": "RENT TRANSFER",
+                "amount": -17600.0,
+                "balance": 24000.0,
+                "type": "debit"
+              },
+              {
+                "date": "${T-90}",
+                "description": "CARD PAYMENT",
+                "amount": -14400.0,
+                "balance": 12000.0,
+                "type": "debit"
+              },
+              {
+                "date": "${T-60}",
+                "description": "SALARY SIAM DIGITAL PAYROLL",
+                "amount": 60000,
+                "balance": 48000.0,
+                "category": "salary",
+                "type": "credit"
+              },
+              {
+                "date": "${T-60}",
+                "description": "RENT TRANSFER",
+                "amount": -17600.0,
+                "balance": 24000.0,
+                "type": "debit"
+              },
+              {
+                "date": "${T-60}",
+                "description": "CARD PAYMENT",
+                "amount": -14400.0,
+                "balance": 12000.0,
+                "type": "debit"
+              },
+              {
+                "date": "${T-30}",
+                "description": "SALARY SIAM DIGITAL PAYROLL",
+                "amount": 60000,
+                "balance": 48000.0,
+                "category": "salary",
+                "type": "credit"
+              },
+              {
+                "date": "${T-30}",
+                "description": "RENT TRANSFER",
+                "amount": -17600.0,
+                "balance": 24000.0,
+                "type": "debit"
+              },
+              {
+                "date": "${T-30}",
+                "description": "CARD PAYMENT",
+                "amount": -14400.0,
+                "balance": 12000.0,
+                "type": "debit"
+              }
+            ]
+          },
+          {
+            "document_id": "SYN-LP-0001-poa",
+            "document_type": "proof_of_address",
+            "file_name": "SYN-LP-0001_utility_bill.pdf",
+            "readable": true,
+            "fields": {
+              "applicant_name": {
+                "value": "Somchai Jaidee",
+                "confidence": 0.93
+              },
+              "current_address": {
+                "value": "88/12 Sukhumvit Road, Watthana, Bangkok 10110",
+                "confidence": 0.94
+              },
+              "document_date": {
+                "value": "${T-25}",
+                "confidence": 0.97
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "case-2-income-mismatch",
+      "title": "Income mismatch",
+      "description": "Application declares THB 80,000; payslips and salary credits show THB 65,000.",
+      "expected_route": "HUMAN_REVIEW",
+      "expected_signals": [
+        "declared_vs_payslip_income MISMATCH (HIGH)",
+        "INCOME_VARIANCE_HIGH"
+      ],
+      "packet": {
+        "packet_id": "SYN-LP-0002",
+        "currency": "THB",
+        "source_pipeline": "loan-packet-processing",
+        "synthetic": true,
+        "documents": [
+          {
+            "document_id": "SYN-LP-0002-app",
+            "document_type": "loan_application",
+            "file_name": "SYN-LP-0002_application.pdf",
+            "readable": true,
+            "fields": {
+              "applicant_name": {
+                "value": "Mr. Somchai Jaidee",
+                "confidence": 0.98
+              },
+              "date_of_birth": {
+                "value": "1988-04-12",
+                "confidence": 0.97
+              },
+              "identification_number": {
+                "value": "1-1023-45678-90-1",
+                "confidence": 0.96
+              },
+              "current_address": {
+                "value": "88/12 Sukhumvit Rd, Watthana, Bangkok 10110",
+                "confidence": 0.95
+              },
+              "employer": {
+                "value": "Siam Digital Co., Ltd.",
+                "confidence": 0.96
+              },
+              "employment_status": {
+                "value": "Full-time permanent",
+                "confidence": 0.97
+              },
+              "declared_monthly_income": {
+                "value": 80000,
+                "confidence": 0.95
+              },
+              "requested_loan_amount": {
+                "value": 300000,
+                "confidence": 0.98
+              },
+              "loan_purpose": {
+                "value": "Home renovation",
+                "confidence": 0.94
+              },
+              "document_date": {
+                "value": "${T-10}",
+                "confidence": 0.99
+              }
+            }
+          },
+          {
+            "document_id": "SYN-LP-0002-id",
+            "document_type": "identification",
+            "file_name": "SYN-LP-0002_national_id.jpg",
+            "readable": true,
+            "fields": {
+              "applicant_name": {
+                "value": "SOMCHAI JAIDEE",
+                "confidence": 0.97
+              },
+              "date_of_birth": {
+                "value": "12/04/1988",
+                "confidence": 0.96
+              },
+              "identification_number": {
+                "value": "1102345678901",
+                "confidence": 0.97
+              },
+              "current_address": {
+                "value": "88/12 Sukhumvit Road, Watthana, Bangkok 10110",
+                "confidence": 0.93
+              },
+              "document_date": {
+                "value": "${T-60}",
+                "confidence": 0.9
+              }
+            }
+          },
+          {
+            "document_id": "SYN-LP-0002-payslip",
+            "document_type": "payslip",
+            "file_name": "SYN-LP-0002_payslip.pdf",
+            "readable": true,
+            "fields": {
+              "applicant_name": {
+                "value": "Somchai Jaidee",
+                "confidence": 0.96
+              },
+              "employer": {
+                "value": "Siam Digital Co Ltd",
+                "confidence": 0.95
+              },
+              "employment_status": {
+                "value": "Full-time",
+                "confidence": 0.94
+              },
+              "net_monthly_income": {
+                "value": 65000,
+                "confidence": 0.96
+              },
+              "document_date": {
+                "value": "${T-20}",
+                "confidence": 0.98
+              }
+            }
+          },
+          {
+            "document_id": "SYN-LP-0002-bank",
+            "document_type": "bank_statement",
+            "file_name": "SYN-LP-0002_bank_statement.pdf",
+            "readable": true,
+            "fields": {
+              "account_holder": {
+                "value": "Somchai Jaidee",
+                "confidence": 0.95
+              },
+              "document_date": {
+                "value": "${T-15}",
+                "confidence": 0.98
+              }
+            },
+            "transactions": [
+              {
+                "date": "${T-90}",
+                "description": "SALARY SIAM DIGITAL PAYROLL",
+                "amount": 65000,
+                "balance": 52000.0,
+                "category": "salary",
+                "type": "credit"
+              },
+              {
+                "date": "${T-90}",
+                "description": "RENT TRANSFER",
+                "amount": -17600.0,
+                "balance": 26000.0,
+                "type": "debit"
+              },
+              {
+                "date": "${T-90}",
+                "description": "CARD PAYMENT",
+                "amount": -14400.0,
+                "balance": 13000.0,
+                "type": "debit"
+              },
+              {
+                "date": "${T-60}",
+                "description": "SALARY SIAM DIGITAL PAYROLL",
+                "amount": 65000,
+                "balance": 52000.0,
+                "category": "salary",
+                "type": "credit"
+              },
+              {
+                "date": "${T-60}",
+                "description": "RENT TRANSFER",
+                "amount": -17600.0,
+                "balance": 26000.0,
+                "type": "debit"
+              },
+              {
+                "date": "${T-60}",
+                "description": "CARD PAYMENT",
+                "amount": -14400.0,
+                "balance": 13000.0,
+                "type": "debit"
+              },
+              {
+                "date": "${T-30}",
+                "description": "SALARY SIAM DIGITAL PAYROLL",
+                "amount": 65000,
+                "balance": 52000.0,
+                "category": "salary",
+                "type": "credit"
+              },
+              {
+                "date": "${T-30}",
+                "description": "RENT TRANSFER",
+                "amount": -17600.0,
+                "balance": 26000.0,
+                "type": "debit"
+              },
+              {
+                "date": "${T-30}",
+                "description": "CARD PAYMENT",
+                "amount": -14400.0,
+                "balance": 13000.0,
+                "type": "debit"
+              }
+            ]
+          },
+          {
+            "document_id": "SYN-LP-0002-poa",
+            "document_type": "proof_of_address",
+            "file_name": "SYN-LP-0002_utility_bill.pdf",
+            "readable": true,
+            "fields": {
+              "applicant_name": {
+                "value": "Somchai Jaidee",
+                "confidence": 0.93
+              },
+              "current_address": {
+                "value": "88/12 Sukhumvit Road, Watthana, Bangkok 10110",
+                "confidence": 0.94
+              },
+              "document_date": {
+                "value": "${T-25}",
+                "confidence": 0.97
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "case-3-address-mismatch",
+      "title": "Address mismatch",
+      "description": "Application address differs from the identification and proof-of-address documents.",
+      "expected_route": "HUMAN_REVIEW",
+      "expected_signals": [
+        "address_consistency MISMATCH",
+        "IDENTITY_UNCERTAIN"
+      ],
+      "packet": {
+        "packet_id": "SYN-LP-0003",
+        "currency": "THB",
+        "source_pipeline": "loan-packet-processing",
+        "synthetic": true,
+        "documents": [
+          {
+            "document_id": "SYN-LP-0003-app",
+            "document_type": "loan_application",
+            "file_name": "SYN-LP-0003_application.pdf",
+            "readable": true,
+            "fields": {
+              "applicant_name": {
+                "value": "Mr. Somchai Jaidee",
+                "confidence": 0.98
+              },
+              "date_of_birth": {
+                "value": "1988-04-12",
+                "confidence": 0.97
+              },
+              "identification_number": {
+                "value": "1-1023-45678-90-1",
+                "confidence": 0.96
+              },
+              "current_address": {
+                "value": "55/7 Phahonyothin Rd, Chatuchak, Bangkok 10900",
+                "confidence": 0.95
+              },
+              "employer": {
+                "value": "Siam Digital Co., Ltd.",
+                "confidence": 0.96
+              },
+              "employment_status": {
+                "value": "Full-time permanent",
+                "confidence": 0.97
+              },
+              "declared_monthly_income": {
+                "value": 60000,
+                "confidence": 0.95
+              },
+              "requested_loan_amount": {
+                "value": 300000,
+                "confidence": 0.98
+              },
+              "loan_purpose": {
+                "value": "Home renovation",
+                "confidence": 0.94
+              },
+              "document_date": {
+                "value": "${T-10}",
+                "confidence": 0.99
+              }
+            }
+          },
+          {
+            "document_id": "SYN-LP-0003-id",
+            "document_type": "identification",
+            "file_name": "SYN-LP-0003_national_id.jpg",
+            "readable": true,
+            "fields": {
+              "applicant_name": {
+                "value": "SOMCHAI JAIDEE",
+                "confidence": 0.97
+              },
+              "date_of_birth": {
+                "value": "12/04/1988",
+                "confidence": 0.96
+              },
+              "identification_number": {
+                "value": "1102345678901",
+                "confidence": 0.97
+              },
+              "current_address": {
+                "value": "88/12 Sukhumvit Road, Watthana, Bangkok 10110",
+                "confidence": 0.93
+              },
+              "document_date": {
+                "value": "${T-60}",
+                "confidence": 0.9
+              }
+            }
+          },
+          {
+            "document_id": "SYN-LP-0003-payslip",
+            "document_type": "payslip",
+            "file_name": "SYN-LP-0003_payslip.pdf",
+            "readable": true,
+            "fields": {
+              "applicant_name": {
+                "value": "Somchai Jaidee",
+                "confidence": 0.96
+              },
+              "employer": {
+                "value": "Siam Digital Co Ltd",
+                "confidence": 0.95
+              },
+              "employment_status": {
+                "value": "Full-time",
+                "confidence": 0.94
+              },
+              "net_monthly_income": {
+                "value": 60000,
+                "confidence": 0.96
+              },
+              "document_date": {
+                "value": "${T-20}",
+                "confidence": 0.98
+              }
+            }
+          },
+          {
+            "document_id": "SYN-LP-0003-bank",
+            "document_type": "bank_statement",
+            "file_name": "SYN-LP-0003_bank_statement.pdf",
+            "readable": true,
+            "fields": {
+              "account_holder": {
+                "value": "Somchai Jaidee",
+                "confidence": 0.95
+              },
+              "document_date": {
+                "value": "${T-15}",
+                "confidence": 0.98
+              }
+            },
+            "transactions": [
+              {
+                "date": "${T-90}",
+                "description": "SALARY SIAM DIGITAL PAYROLL",
+                "amount": 60000,
+                "balance": 48000.0,
+                "category": "salary",
+                "type": "credit"
+              },
+              {
+                "date": "${T-90}",
+                "description": "RENT TRANSFER",
+                "amount": -17600.0,
+                "balance": 24000.0,
+                "type": "debit"
+              },
+              {
+                "date": "${T-90}",
+                "description": "CARD PAYMENT",
+                "amount": -14400.0,
+                "balance": 12000.0,
+                "type": "debit"
+              },
+              {
+                "date": "${T-60}",
+                "description": "SALARY SIAM DIGITAL PAYROLL",
+                "amount": 60000,
+                "balance": 48000.0,
+                "category": "salary",
+                "type": "credit"
+              },
+              {
+                "date": "${T-60}",
+                "description": "RENT TRANSFER",
+                "amount": -17600.0,
+                "balance": 24000.0,
+                "type": "debit"
+              },
+              {
+                "date": "${T-60}",
+                "description": "CARD PAYMENT",
+                "amount": -14400.0,
+                "balance": 12000.0,
+                "type": "debit"
+              },
+              {
+                "date": "${T-30}",
+                "description": "SALARY SIAM DIGITAL PAYROLL",
+                "amount": 60000,
+                "balance": 48000.0,
+                "category": "salary",
+                "type": "credit"
+              },
+              {
+                "date": "${T-30}",
+                "description": "RENT TRANSFER",
+                "amount": -17600.0,
+                "balance": 24000.0,
+                "type": "debit"
+              },
+              {
+                "date": "${T-30}",
+                "description": "CARD PAYMENT",
+                "amount": -14400.0,
+                "balance": 12000.0,
+                "type": "debit"
+              }
+            ]
+          },
+          {
+            "document_id": "SYN-LP-0003-poa",
+            "document_type": "proof_of_address",
+            "file_name": "SYN-LP-0003_utility_bill.pdf",
+            "readable": true,
+            "fields": {
+              "applicant_name": {
+                "value": "Somchai Jaidee",
+                "confidence": 0.93
+              },
+              "current_address": {
+                "value": "88/12 Sukhumvit Road, Watthana, Bangkok 10110",
+                "confidence": 0.94
+              },
+              "document_date": {
+                "value": "${T-25}",
+                "confidence": 0.97
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "case-4-missing-document",
+      "title": "Missing document",
+      "description": "Bank statement is absent from the packet.",
+      "expected_route": "HUMAN_REVIEW",
+      "expected_signals": [
+        "missing_documents contains bank_statement",
+        "MISSING_REQUIRED_DOCUMENT"
+      ],
+      "packet": {
+        "packet_id": "SYN-LP-0004",
+        "currency": "THB",
+        "source_pipeline": "loan-packet-processing",
+        "synthetic": true,
+        "documents": [
+          {
+            "document_id": "SYN-LP-0004-app",
+            "document_type": "loan_application",
+            "file_name": "SYN-LP-0004_application.pdf",
+            "readable": true,
+            "fields": {
+              "applicant_name": {
+                "value": "Mr. Somchai Jaidee",
+                "confidence": 0.98
+              },
+              "date_of_birth": {
+                "value": "1988-04-12",
+                "confidence": 0.97
+              },
+              "identification_number": {
+                "value": "1-1023-45678-90-1",
+                "confidence": 0.96
+              },
+              "current_address": {
+                "value": "88/12 Sukhumvit Rd, Watthana, Bangkok 10110",
+                "confidence": 0.95
+              },
+              "employer": {
+                "value": "Siam Digital Co., Ltd.",
+                "confidence": 0.96
+              },
+              "employment_status": {
+                "value": "Full-time permanent",
+                "confidence": 0.97
+              },
+              "declared_monthly_income": {
+                "value": 60000,
+                "confidence": 0.95
+              },
+              "requested_loan_amount": {
+                "value": 300000,
+                "confidence": 0.98
+              },
+              "loan_purpose": {
+                "value": "Home renovation",
+                "confidence": 0.94
+              },
+              "document_date": {
+                "value": "${T-10}",
+                "confidence": 0.99
+              }
+            }
+          },
+          {
+            "document_id": "SYN-LP-0004-id",
+            "document_type": "identification",
+            "file_name": "SYN-LP-0004_national_id.jpg",
+            "readable": true,
+            "fields": {
+              "applicant_name": {
+                "value": "SOMCHAI JAIDEE",
+                "confidence": 0.97
+              },
+              "date_of_birth": {
+                "value": "12/04/1988",
+                "confidence": 0.96
+              },
+              "identification_number": {
+                "value": "1102345678901",
+                "confidence": 0.97
+              },
+              "current_address": {
+                "value": "88/12 Sukhumvit Road, Watthana, Bangkok 10110",
+                "confidence": 0.93
+              },
+              "document_date": {
+                "value": "${T-60}",
+                "confidence": 0.9
+              }
+            }
+          },
+          {
+            "document_id": "SYN-LP-0004-payslip",
+            "document_type": "payslip",
+            "file_name": "SYN-LP-0004_payslip.pdf",
+            "readable": true,
+            "fields": {
+              "applicant_name": {
+                "value": "Somchai Jaidee",
+                "confidence": 0.96
+              },
+              "employer": {
+                "value": "Siam Digital Co Ltd",
+                "confidence": 0.95
+              },
+              "employment_status": {
+                "value": "Full-time",
+                "confidence": 0.94
+              },
+              "net_monthly_income": {
+                "value": 60000,
+                "confidence": 0.96
+              },
+              "document_date": {
+                "value": "${T-20}",
+                "confidence": 0.98
+              }
+            }
+          },
+          {
+            "document_id": "SYN-LP-0004-poa",
+            "document_type": "proof_of_address",
+            "file_name": "SYN-LP-0004_utility_bill.pdf",
+            "readable": true,
+            "fields": {
+              "applicant_name": {
+                "value": "Somchai Jaidee",
+                "confidence": 0.93
+              },
+              "current_address": {
+                "value": "88/12 Sukhumvit Road, Watthana, Bangkok 10110",
+                "confidence": 0.94
+              },
+              "document_date": {
+                "value": "${T-25}",
+                "confidence": 0.97
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "case-5-unstable-income",
+      "title": "Unstable income",
+      "description": "Salary deposits swing between THB 30,000 and THB 95,000 over three months.",
+      "expected_route": "HUMAN_REVIEW",
+      "expected_signals": [
+        "UNSTABLE_INCOME_HIGH",
+        "risk_level HIGH"
+      ],
+      "packet": {
+        "packet_id": "SYN-LP-0005",
+        "currency": "THB",
+        "source_pipeline": "loan-packet-processing",
+        "synthetic": true,
+        "documents": [
+          {
+            "document_id": "SYN-LP-0005-app",
+            "document_type": "loan_application",
+            "file_name": "SYN-LP-0005_application.pdf",
+            "readable": true,
+            "fields": {
+              "applicant_name": {
+                "value": "Mr. Somchai Jaidee",
+                "confidence": 0.98
+              },
+              "date_of_birth": {
+                "value": "1988-04-12",
+                "confidence": 0.97
+              },
+              "identification_number": {
+                "value": "1-1023-45678-90-1",
+                "confidence": 0.96
+              },
+              "current_address": {
+                "value": "88/12 Sukhumvit Rd, Watthana, Bangkok 10110",
+                "confidence": 0.95
+              },
+              "employer": {
+                "value": "Siam Digital Co., Ltd.",
+                "confidence": 0.96
+              },
+              "employment_status": {
+                "value": "Full-time permanent",
+                "confidence": 0.97
+              },
+              "declared_monthly_income": {
+                "value": 65000,
+                "confidence": 0.95
+              },
+              "requested_loan_amount": {
+                "value": 300000,
+                "confidence": 0.98
+              },
+              "loan_purpose": {
+                "value": "Home renovation",
+                "confidence": 0.94
+              },
+              "document_date": {
+                "value": "${T-10}",
+                "confidence": 0.99
+              }
+            }
+          },
+          {
+            "document_id": "SYN-LP-0005-id",
+            "document_type": "identification",
+            "file_name": "SYN-LP-0005_national_id.jpg",
+            "readable": true,
+            "fields": {
+              "applicant_name": {
+                "value": "SOMCHAI JAIDEE",
+                "confidence": 0.97
+              },
+              "date_of_birth": {
+                "value": "12/04/1988",
+                "confidence": 0.96
+              },
+              "identification_number": {
+                "value": "1102345678901",
+                "confidence": 0.97
+              },
+              "current_address": {
+                "value": "88/12 Sukhumvit Road, Watthana, Bangkok 10110",
+                "confidence": 0.93
+              },
+              "document_date": {
+                "value": "${T-60}",
+                "confidence": 0.9
+              }
+            }
+          },
+          {
+            "document_id": "SYN-LP-0005-payslip",
+            "document_type": "payslip",
+            "file_name": "SYN-LP-0005_payslip.pdf",
+            "readable": true,
+            "fields": {
+              "applicant_name": {
+                "value": "Somchai Jaidee",
+                "confidence": 0.96
+              },
+              "employer": {
+                "value": "Siam Digital Co Ltd",
+                "confidence": 0.95
+              },
+              "employment_status": {
+                "value": "Full-time",
+                "confidence": 0.94
+              },
+              "net_monthly_income": {
+                "value": 65000,
+                "confidence": 0.96
+              },
+              "document_date": {
+                "value": "${T-20}",
+                "confidence": 0.98
+              }
+            }
+          },
+          {
+            "document_id": "SYN-LP-0005-bank",
+            "document_type": "bank_statement",
+            "file_name": "SYN-LP-0005_bank_statement.pdf",
+            "readable": true,
+            "fields": {
+              "account_holder": {
+                "value": "Somchai Jaidee",
+                "confidence": 0.95
+              },
+              "document_date": {
+                "value": "${T-15}",
+                "confidence": 0.98
+              }
+            },
+            "transactions": [
+              {
+                "date": "${T-90}",
+                "description": "SALARY SIAM DIGITAL PAYROLL",
+                "amount": 65000,
+                "balance": 52000.0,
+                "category": "salary",
+                "type": "credit"
+              },
+              {
+                "date": "${T-90}",
+                "description": "RENT TRANSFER",
+                "amount": -17600.0,
+                "balance": 26000.0,
+                "type": "debit"
+              },
+              {
+                "date": "${T-90}",
+                "description": "CARD PAYMENT",
+                "amount": -14400.0,
+                "balance": 13000.0,
+                "type": "debit"
+              },
+              {
+                "date": "${T-60}",
+                "description": "SALARY SIAM DIGITAL PAYROLL",
+                "amount": 30000,
+                "balance": 24000.0,
+                "category": "salary",
+                "type": "credit"
+              },
+              {
+                "date": "${T-60}",
+                "description": "RENT TRANSFER",
+                "amount": -17600.0,
+                "balance": 12000.0,
+                "type": "debit"
+              },
+              {
+                "date": "${T-60}",
+                "description": "CARD PAYMENT",
+                "amount": -14400.0,
+                "balance": 6000.0,
+                "type": "debit"
+              },
+              {
+                "date": "${T-30}",
+                "description": "SALARY SIAM DIGITAL PAYROLL",
+                "amount": 95000,
+                "balance": 76000.0,
+                "category": "salary",
+                "type": "credit"
+              },
+              {
+                "date": "${T-30}",
+                "description": "RENT TRANSFER",
+                "amount": -17600.0,
+                "balance": 38000.0,
+                "type": "debit"
+              },
+              {
+                "date": "${T-30}",
+                "description": "CARD PAYMENT",
+                "amount": -14400.0,
+                "balance": 19000.0,
+                "type": "debit"
+              }
+            ]
+          },
+          {
+            "document_id": "SYN-LP-0005-poa",
+            "document_type": "proof_of_address",
+            "file_name": "SYN-LP-0005_utility_bill.pdf",
+            "readable": true,
+            "fields": {
+              "applicant_name": {
+                "value": "Somchai Jaidee",
+                "confidence": 0.93
+              },
+              "current_address": {
+                "value": "88/12 Sukhumvit Road, Watthana, Bangkok 10110",
+                "confidence": 0.94
+              },
+              "document_date": {
+                "value": "${T-25}",
+                "confidence": 0.97
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

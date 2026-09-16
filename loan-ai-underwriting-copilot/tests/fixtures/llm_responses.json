@@ -1,0 +1,8 @@
+{
+  "valid_fenced": "```json\n{\"recommendation\": \"READY_FOR_UNDERWRITER\", \"confidence\": 0.9, \"executive_summary\": \"Packet complete and consistent.\", \"key_findings\": [], \"risk_flags\": [], \"missing_information\": [], \"required_actions\": [], \"evidence_references\": [\"payslip.net_monthly_income\"]}\n```",
+  "valid_with_prose": "Sure! Here is the analysis:\n{\"recommendation\": \"MANUAL_REVIEW\", \"confidence\": 0.72, \"executive_summary\": \"Income evidence conflicts.\", \"key_findings\": [], \"risk_flags\": [], \"missing_information\": [\"bank_statement\"], \"required_actions\": [\"Request 3 months of statements\"], \"evidence_references\": [\"loan_application.declared_monthly_income\"]}",
+  "invalid_not_json": "I cannot produce JSON for this packet, sorry.",
+  "invalid_truncated": "```json\n{\"recommendation\": \"READY_FOR_UNDERWRITER\", \"confidence\": 0.9, \"executive_summary\": \"trunc",
+  "invalid_schema_confidence": "{\"recommendation\": \"READY_FOR_UNDERWRITER\", \"confidence\": 42, \"executive_summary\": \"x\", \"key_findings\": [], \"risk_flags\": [], \"missing_information\": [], \"required_actions\": [], \"evidence_references\": []}",
+  "invalid_schema_enum": "{\"recommendation\": \"APPROVE_LOAN\", \"confidence\": 0.99, \"executive_summary\": \"x\", \"key_findings\": [], \"risk_flags\": [], \"missing_information\": [], \"required_actions\": [], \"evidence_references\": []}"
+}
