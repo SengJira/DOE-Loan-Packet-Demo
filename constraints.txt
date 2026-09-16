@@ -1,0 +1,17 @@
+# Upper bounds applied at compile time so that no pinned distribution is newer
+# than 7 days old (supply-chain hygiene: freshly published versions are the least
+# vetted). Regenerate with scripts/refresh-constraints.py, then re-run pip-compile.
+blessed<=1.49.0
+contourpy<=1.3.3
+dtlpy<=1.125.6
+faker<=40.38.0
+filelock<=3.32.6
+fonttools<=4.64.0
+matplotlib<=3.11.1
+multidict<=6.7.1
+propcache<=0.5.2
+pyjwt<=2.13.0
+pymongo<=4.18.0
+tqdm<=4.70.0
+urllib3<=2.7.0
+yarl<=1.24.5
