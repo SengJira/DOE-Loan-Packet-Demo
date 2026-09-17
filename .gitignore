@@ -1,2 +1,26 @@
+# generated demo data — never commit, it is large and regenerable
+demo_data/
+.smoke/
+*.digest.json
+
+# credentials — never commit
+.env
+.env.*
+!.env.example
+*.token
+token.json
+dataloop_token*
+dtlpy.json
 .dataloop/
+secrets/
+*.pem
+*.key
+
+# offline bundles (task 2)
+bundle/
+*.tar
+
+# python
 __pycache__/
+*.py[cod]
+.venv/

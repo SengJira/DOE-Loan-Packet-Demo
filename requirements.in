@@ -1,0 +1,8 @@
+# Direct dependencies of the loan-packet demo toolkit.
+# requirements.txt is the fully-pinned, hash-locked compilation of this file.
+# See "Regenerating requirements.txt" in README.md.
+faker
+reportlab
+pymupdf
+pillow
+dtlpy
