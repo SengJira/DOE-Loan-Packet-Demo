@@ -1,0 +1,20 @@
+Prepare an evidence-grounded underwriting brief for packet {packet_id}.
+
+The context below is the complete set of facts available to you. It was produced
+by deterministic extraction and rule-based checks. Do not add facts to it.
+
+## Completeness (node 1)
+{completeness_json}
+
+## Borrower context (node 2, identifiers masked)
+{borrower_json}
+
+## Cross-document checks (node 3)
+{cross_document_json}
+
+## Financial risk indicators (node 4, transparent demo heuristics, not a credit score)
+{risk_json}
+
+Produce the JSON object described in the system message. Reference evidence using
+the document_type and field names that appear above. Do not output anything other
+than the JSON object.
