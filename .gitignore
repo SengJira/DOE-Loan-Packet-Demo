@@ -16,9 +16,11 @@ secrets/
 *.pem
 *.key
 
-# offline bundles (task 2)
+# offline bundles
 bundle/
+offline_demo/
 *.tar
+SHA256SUMS.txt
 
 # python
 __pycache__/
