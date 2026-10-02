@@ -55,6 +55,21 @@ def parse_json_response(text: str) -> dict[str, Any]:
     return parsed
 
 
+def normalize_llm_json(parsed: dict[str, Any], schema: dict[str, Any]) -> dict[str, Any]:
+    """Coerce malformed scalar values into the shape the schema expects.
+
+    Some models emit ``null`` or the literal string ``"None"`` for fields the
+    schema declares as arrays; a missing list is semantically "no actions",
+    not invalid output.
+    """
+    for key, prop in schema.get("properties", {}).items():
+        value = parsed.get(key)
+        if prop.get("type") == "array" and not isinstance(value, list):
+            if value is None or (isinstance(value, str) and value.strip().lower() in {"", "none", "null"}):
+                parsed[key] = []
+    return parsed
+
+
 class NvidiaClient:
     def __init__(self, config: Config | None = None, session: requests.Session | None = None):
         self.config = config or load_config()
@@ -136,7 +151,7 @@ class NvidiaClient:
             "stream": False,
         }
         content = self._post_with_retries(payload, packet_id=packet_id, cycle_id=cycle_id)
-        parsed = parse_json_response(content)
+        parsed = normalize_llm_json(parse_json_response(content), schema or {})
         if schema is not None:
             try:
                 validate(parsed, schema, "llm_response")
