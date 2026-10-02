@@ -58,15 +58,17 @@ def parse_json_response(text: str) -> dict[str, Any]:
 def normalize_llm_json(parsed: dict[str, Any], schema: dict[str, Any]) -> dict[str, Any]:
     """Coerce malformed scalar values into the shape the schema expects.
 
-    Some models emit ``null`` or the literal string ``"None"`` for fields the
-    schema declares as arrays; a missing list is semantically "no actions",
-    not invalid output.
+    Some models emit ``null``, the literal string ``"None"``, or a plain
+    sentence for fields the schema declares as arrays; a missing list is
+    semantically "no items" and a sentence is one item, not invalid output.
     """
     for key, prop in schema.get("properties", {}).items():
         value = parsed.get(key)
         if prop.get("type") == "array" and not isinstance(value, list):
             if value is None or (isinstance(value, str) and value.strip().lower() in {"", "none", "null"}):
                 parsed[key] = []
+            elif isinstance(value, str):
+                parsed[key] = [value]
     return parsed
 
 
